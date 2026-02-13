@@ -2,6 +2,10 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 import json
 import asyncio
+import threading
+import time
+import sys
+import os
 
 app = FastAPI()
 
@@ -37,3 +41,27 @@ async def websocket_endpoint(ws: WebSocket):
         await ws.send_text(json.dumps(actions[index]))
         index = (index + 1) % len(actions)
         await asyncio.sleep(4)
+
+
+
+
+
+
+
+
+
+
+
+
+# Import the service
+from modules.wake_word import WakeWordService
+
+def on_wake_word_detected():
+    """
+    This function triggers when the Pi hears the wake word.
+    """
+    print("\n------------------------------------------------")
+    print(">>> TRIGGER: 'Hey Adorix' Detected on Raspberry Pi!")
+    print(">>> Action: Waking up Avatar...")
+    print("------------------------------------------------\n")
+    # TODO: Add logic here to turn on the screen or start recording
