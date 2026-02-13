@@ -1,7 +1,7 @@
 import time
-from backend.modules.tts_engine import speak
-from backend.modules.stt_engine import listen_one_phrase
-from backend.modules.brain_engine import get_answer_from_data
+from tts_engine import speak
+from stt_engine import listen_one_phrase
+from brain_engine import get_answer_from_data
 
 def start_interaction_loop(current_product_data):
     """
