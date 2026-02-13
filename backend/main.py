@@ -65,3 +65,25 @@ def on_wake_word_detected():
     print(">>> Action: Waking up Avatar...")
     print("------------------------------------------------\n")
     # TODO: Add logic here to turn on the screen or start recording
+
+    def start_backend():
+    print(">>> [System] Starting Adorix Backend on Raspberry Pi...")
+
+    # Initialize Service
+    service = WakeWordService(callback_function=on_wake_word_detected)
+
+    # Run in background thread
+    t = threading.Thread(target=service.start)
+    t.daemon = True
+    t.start()
+
+    # Keep Main Program Alive
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nStopping...")
+        service.stop()
+
+if __name__ == "__main__":
+    start_backend()
