@@ -66,7 +66,7 @@ def on_wake_word_detected():
     print("------------------------------------------------\n")
     # TODO: Add logic here to turn on the screen or start recording
 
-    def start_backend():
+def start_backend():
     print(">>> [System] Starting Adorix Backend on Raspberry Pi...")
 
     # Initialize Service
