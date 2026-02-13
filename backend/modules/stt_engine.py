@@ -20,7 +20,6 @@ def listen_one_phrase(timeout=10):
             
             print(" Processing audio...")
             # Convert audio to text (Using Google Web Speech API - requires internet)
-            # For offline, you would use Vosk here.
             text = recognizer.recognize_google(audio)
             print(f" USER: {text}")
             return text.lower()
