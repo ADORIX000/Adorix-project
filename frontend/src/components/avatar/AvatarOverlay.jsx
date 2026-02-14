@@ -103,18 +103,23 @@ export default function AvatarOverlay({ state }) {
 
   return (
     <div style={styles.stage}>
-      {/* Listening ring */}
-      {state === AVATAR_STATE.LISTENING && (
-        <motion.div
-          style={styles.ringCss}
-          animate={{ scale: [1, 1.06, 1], opacity: [0.35, 0.9, 0.35] }}
-          transition={{ repeat: Infinity, duration: 1.05, ease: "easeInOut" }}
-        />
-      )}
-
       <div style={styles.ambientGlow} />
 
       <motion.div style={styles.stack} animate={stackMotion} transition={stackTransition}>
+        {/* ✅ LISTENING: avatar-shaped glow (silhouette) */}
+        {state === AVATAR_STATE.LISTENING && (
+          <motion.img
+            src={LAYERS.body}
+            alt="glow"
+            style={styles.glowSilhouette}
+            animate={{
+              opacity: [0.25, 0.7, 0.25],
+              scale: [1.03, 1.07, 1.03],
+            }}
+            transition={{ repeat: Infinity, duration: 1.0, ease: "easeInOut" }}
+          />
+        )}
+
         {/* ✅ BODY follows slightly to hide neck seam */}
         <motion.img
           src={LAYERS.body}
@@ -170,18 +175,9 @@ const styles = {
     width: 560,
     height: 560,
     borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(0,255,180,0.12), rgba(0,0,0,0))",
+    background: "radial-gradient(circle, rgba(0,255,180,0.10), rgba(0,0,0,0))",
     filter: "blur(6px)",
     opacity: 0.85,
-    pointerEvents: "none",
-  },
-  ringCss: {
-    position: "absolute",
-    width: 560,
-    height: 560,
-    borderRadius: "50%",
-    border: "4px solid rgba(0, 255, 180, 0.55)",
-    boxShadow: "0 0 40px rgba(0, 255, 180, 0.25)",
     pointerEvents: "none",
   },
   stack: {
@@ -189,12 +185,26 @@ const styles = {
     width: 420,
     height: 420,
   },
+
+  // ✅ Avatar-shaped glow (same silhouette)
+  glowSilhouette: {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    filter: "blur(18px)",
+    opacity: 0.55,
+    transform: "scale(1.06)",
+    pointerEvents: "none",
+  },
+
   faceGroup: {
     position: "absolute",
     inset: 0,
     width: "100%",
     height: "100%",
-    transformOrigin: "50% 72%", // ✅ lower = neck pivot
+    transformOrigin: "50% 72%", // neck pivot
   },
   layer: {
     position: "absolute",
