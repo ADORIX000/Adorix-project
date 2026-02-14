@@ -1,53 +1,37 @@
 import React from "react";
-import { AVATAR_STATE } from "./avatarStates";
+import AvatarOverlay from "./AvatarOverlay";
 
 export default function AvatarStage({ state, lastMessage }) {
-  const getFace = () => {
-    switch (state) {
-      case AVATAR_STATE.LISTENING:
-        return "👂";
-      case AVATAR_STATE.TALKING:
-        return "🗣️";
-      case AVATAR_STATE.SHOW_AD:
-        return "📺";
-      case AVATAR_STATE.ERROR:
-        return "⚠️";
-      case AVATAR_STATE.IDLE:
-      default:
-        return "🙂";
-    }
-  };
-
   return (
-    <div
-      style={{
-        height: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-        fontFamily: "Arial",
-        gap: 10,
-      }}
-    >
-      <div style={{ fontSize: 120 }}>{getFace()}</div>
-      <h2>Avatar State: {state}</h2>
+    <div style={{ position: "relative" }}>
+      <AvatarOverlay state={state} />
 
-      <div style={{ width: "85%", maxWidth: 900 }}>
-        <p style={{ opacity: 0.7, marginBottom: 6 }}>Last WS Message:</p>
-        <pre
-          style={{
-            background: "#111",
-            color: "#0f0",
-            padding: 12,
-            borderRadius: 10,
-            overflowX: "auto",
-            fontSize: 12,
-          }}
-        >
-          {lastMessage || "No message yet"}
-        </pre>
+      {/* Debug panel (you can remove later) */}
+      <div style={styles.debug}>
+        <div><b>State:</b> {state}</div>
+        <div style={{ opacity: 0.7, marginTop: 6 }}>Last WS:</div>
+        <pre style={styles.pre}>{lastMessage || "No message yet"}</pre>
       </div>
     </div>
   );
 }
+
+const styles = {
+  debug: {
+    position: "absolute",
+    left: 16,
+    bottom: 16,
+    background: "rgba(0,0,0,0.55)",
+    color: "white",
+    padding: 12,
+    borderRadius: 10,
+    width: 360,
+    fontSize: 12,
+  },
+  pre: {
+    whiteSpace: "pre-wrap",
+    wordBreak: "break-word",
+    margin: 0,
+    marginTop: 6,
+  },
+};
