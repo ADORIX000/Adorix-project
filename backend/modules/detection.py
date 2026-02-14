@@ -4,13 +4,14 @@ import time
 import json
 import numpy as np
 from collections import Counter, deque
+from deepface import DeepFace
 
 from .camera import Camera
 
 
 class AgeGenderDetector:
     """
-    Vision service:
+    Vision service using DeepFace:
     - tracks ALL faces with IDs
     - commits only after DWELL_SECONDS
     - exports committed people to: ADORIX_PROJECT/shared/current_users.json
@@ -21,53 +22,34 @@ class AgeGenderDetector:
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.PROJECT_ROOT = base_dir
 
-        self.MODEL_PATH = os.path.join(self.PROJECT_ROOT, "services", "vision", "models") + os.sep
         self.SHARED_DIR = os.path.join(self.PROJECT_ROOT, "shared")
         self.SHARED_JSON = os.path.join(self.SHARED_DIR, "current_users.json")
         os.makedirs(self.SHARED_DIR, exist_ok=True)
 
-        # Raspberry Pi performance knobs
-        self.SKIP_FRAMES = 10
+        # Raspberry Pi performance knobs (Adjusted for DeepFace)
+        self.SKIP_FRAMES = 15  # DeepFace is heavier, skip more frames
         self.DETECT_WIDTH = 320
-        self.MAX_TRACKS = 4
-        self.PER_TRACK_INFER_EVERY = 3
+        self.MAX_TRACKS = 2    # Reduce max tracks for performance
+        self.PER_TRACK_INFER_EVERY = 2
         self.EXPORT_EVERY_FRAMES = 20
 
         # Dwell gating
-        self.DWELL_SECONDS = 5.0
+        self.DWELL_SECONDS = 3.0 # Feel more responsive
         self.TRACK_TIMEOUT = 2.0
         self.MATCH_DISTANCE = 90
 
         # Smoothing
-        self.SAMPLES_WINDOW = 20
-        self.MIN_SAMPLES_FOR_STABLE = 8
+        self.SAMPLES_WINDOW = 15
+        self.MIN_SAMPLES_FOR_STABLE = 5
 
         # UI (for debug window)
         self.DRAW_DEBUG_WINDOW = False
         self.LABEL_BG_COLOR = (180, 255, 180)  # soft green
         self.LABEL_TEXT_COLOR = (0, 0, 0)
 
-        print("[INFO] Loading models...")
-        self.face_net = cv2.dnn.readNet(
-            self.MODEL_PATH + "opencv_face_detector_uint8.pb",
-            self.MODEL_PATH + "opencv_face_detector.pbtxt"
-        )
-        self.age_net = cv2.dnn.readNet(
-            self.MODEL_PATH + "age_net.caffemodel",
-            self.MODEL_PATH + "age_deploy.prototxt"
-        )
-        self.gender_net = cv2.dnn.readNet(
-            self.MODEL_PATH + "gender_net.caffemodel",
-            self.MODEL_PATH + "gender_deploy.prototxt"
-        )
-
-        self.MODEL_MEAN_VALUES = (78.4263377603, 87.7689143744, 114.895847746)
-        self.GENDER_LIST = ["Male", "Female"]
-        self.AGE_MAP = {
-            0: "Under 4", 1: "4-10", 2: "10-16", 3: "16-19",
-            4: "19-29", 5: "29-39", 6: "49-69", 7: "69-99"
-        }
-
+        print("[INFO] Initializing DeepFace models...")
+        # We don't pre-load explicitly here, DeepFace will handle it on first run
+        
         self.frame_count = 0
         self.next_track_id = 1
         self.tracks = {}
@@ -106,29 +88,34 @@ class AgeGenderDetector:
             self.cam.stop()
 
     # ---------- face detection ----------
-    def _detect_faces_small(self, small_bgr, conf_threshold=0.7):
-        h, w = small_bgr.shape[:2]
-        blob = cv2.dnn.blobFromImage(
-            small_bgr, 1.0, (300, 300), [104, 117, 123], swapRB=False, crop=False
-        )
-        self.face_net.setInput(blob)
-        detections = self.face_net.forward()
-
-        bboxes = []
-        for i in range(detections.shape[2]):
-            conf = float(detections[0, 0, i, 2])
-            if conf >= conf_threshold:
-                box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-                x1, y1, x2, y2 = box.astype("int")
-                x1 = max(0, min(x1, w - 1))
-                y1 = max(0, min(y1, h - 1))
-                x2 = max(0, min(x2, w - 1))
-                y2 = max(0, min(y2, h - 1))
-                if x2 > x1 and y2 > y1:
-                    bboxes.append((x1, y1, x2, y2))
-
-        bboxes.sort(key=self._bbox_area, reverse=True)
-        return bboxes
+    def _detect_faces_small(self, small_bgr):
+        """
+        Uses DeepFace (with opencv backend) for detection.
+        Returns a list of (x1, y1, x2, y2)
+        """
+        try:
+            # detector_backend can be 'opencv', 'retinaface', 'mtcnn', 'yolov8', etc.
+            # 'opencv' is fastest for RPi contexts.
+            faces = DeepFace.extract_faces(
+                img_path=small_bgr, 
+                detector_backend='opencv', 
+                enforce_detection=False,
+                align=False
+            )
+            
+            bboxes = []
+            for face in faces:
+                # face['confidence'] check
+                if face['confidence'] > 0.7:
+                    r = face['facial_area']
+                    # r is {x, y, w, h}
+                    bboxes.append((r['x'], r['y'], r['x'] + r['w'], r['y'] + r['h']))
+            
+            bboxes.sort(key=self._bbox_area, reverse=True)
+            return bboxes
+        except Exception as e:
+            print(f"[ERROR] Face extraction failed: {e}")
+            return []
 
     # ---------- tracking ----------
     def _cleanup_tracks(self, now_ts):
@@ -174,7 +161,7 @@ class AgeGenderDetector:
                     "first_seen": now_ts,
                     "last_seen": now_ts,
                     "gender_samples": deque(maxlen=self.SAMPLES_WINDOW),
-                    "age_idx_samples": deque(maxlen=self.SAMPLES_WINDOW),
+                    "age_samples": deque(maxlen=self.SAMPLES_WINDOW),
                     "infer_counter": 0,
                     "stable": None
                 }
@@ -185,34 +172,40 @@ class AgeGenderDetector:
 
     # ---------- inference ----------
     def _predict_age_gender(self, face_img_bgr):
-        blob = cv2.dnn.blobFromImage(face_img_bgr, 1.0, (227, 227), self.MODEL_MEAN_VALUES, swapRB=False)
+        """
+        DeepFace analysis for age and gender.
+        """
+        try:
+            results = DeepFace.analyze(
+                img_path=face_img_bgr, 
+                actions=['age', 'gender'],
+                enforce_detection=False,
+                silent=True
+            )
+            if results:
+                res = results[0]
+                gender = res['dominant_gender']
+                age = int(res['age'])
+                return gender, age
+        except Exception as e:
+            pass # Analysis might fail on poor crops
+        
+        return None, None
 
-        self.gender_net.setInput(blob)
-        gender_preds = self.gender_net.forward()
-        gender = self.GENDER_LIST[int(gender_preds[0].argmax())]
-
-        self.age_net.setInput(blob)
-        age_preds = self.age_net.forward()
-        age_idx = int(age_preds[0].argmax())
-
-        return gender, age_idx
-
-    @staticmethod
-    def _smoothed_age_idx(age_idx_samples: deque):
-        if not age_idx_samples:
-            return None
-        arr = np.array(list(age_idx_samples), dtype=np.int32)
-        return int(np.median(arr))
-
-    def _update_track_samples(self, tid, gender, age_idx):
+    def _update_track_samples(self, tid, gender, age):
+        if gender is None or age is None:
+            return
+            
         t = self.tracks[tid]
         t["gender_samples"].append(gender)
-        t["age_idx_samples"].append(age_idx)
+        t["age_samples"].append(age)
 
-        if len(t["gender_samples"]) >= self.MIN_SAMPLES_FOR_STABLE and len(t["age_idx_samples"]) >= self.MIN_SAMPLES_FOR_STABLE:
+        if len(t["gender_samples"]) >= self.MIN_SAMPLES_FOR_STABLE:
             final_gender = Counter(t["gender_samples"]).most_common(1)[0][0]
-            smooth_idx = self._smoothed_age_idx(t["age_idx_samples"])
-            final_age = self.AGE_MAP.get(smooth_idx, "Unknown")
+            final_age = int(np.median(list(t["age_samples"])))
+            
+            # Group age into readable ranges for the dashboard if needed
+            # Or just keep it as a number
             t["stable"] = {"id": tid, "gender": final_gender, "age": final_age}
 
     # ---------- public output ----------
@@ -229,6 +222,7 @@ class AgeGenderDetector:
         people = self.get_committed_people(now_ts)
         payload = {
             "status": "ACTIVE" if people else "IDLE",
+            "presence": len(self.tracks) > 0,
             "primary": people[0] if people else None,
             "people": people
         }
@@ -302,13 +296,21 @@ class AgeGenderDetector:
             dwell = now_ts - t["first_seen"]
             remaining = max(0.0, self.DWELL_SECONDS - dwell)
 
+    def _draw_debug(self, frame, now_ts):
+        # draw tracks
+        for tid, t in self.tracks.items():
+            x1, y1, x2, y2 = t["bbox"]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
+
+            dwell = now_ts - t["first_seen"]
+            remaining = max(0.0, self.DWELL_SECONDS - dwell)
+
             if t["stable"]:
                 g = t["stable"]["gender"]
                 a = t["stable"]["age"]
             else:
                 g = Counter(t["gender_samples"]).most_common(1)[0][0] if t["gender_samples"] else "..."
-                s_idx = self._smoothed_age_idx(t["age_idx_samples"])
-                a = self.AGE_MAP.get(s_idx, "...") if s_idx is not None else "..."
+                a = int(np.median(list(t["age_samples"]))) if t["age_samples"] else "..."
 
             committed = (dwell >= self.DWELL_SECONDS and t["stable"] is not None)
             label = f"ID:{tid} {g} {a}" if committed else f"ID:{tid} {g} {a} (wait {remaining:.1f}s)"
