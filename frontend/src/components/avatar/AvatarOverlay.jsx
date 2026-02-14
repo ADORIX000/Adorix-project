@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { AVATAR_STATE } from "./avatarStates";
 
-// Uses assets from: frontend/public/avatar/
 const LAYERS = {
   body: "/avatar/body.png",
   head: "/avatar/head.png",
@@ -16,15 +15,15 @@ const LAYERS = {
 export default function AvatarOverlay({ state }) {
   const [blink, setBlink] = useState(false);
   const [mouthFrame, setMouthFrame] = useState(0);
-
-  // --- Blink loop (random-ish) ---
   const blinkTimeoutRef = useRef(null);
+
+  // ✅ Blink loop (random-ish + visible)
   useEffect(() => {
     const scheduleBlink = () => {
       const next = 2200 + Math.random() * 2200; // 2.2s - 4.4s
       blinkTimeoutRef.current = setTimeout(() => {
         setBlink(true);
-        setTimeout(() => setBlink(false), 220); // visible blink
+        setTimeout(() => setBlink(false), 220);
         scheduleBlink();
       }, next);
     };
@@ -32,15 +31,13 @@ export default function AvatarOverlay({ state }) {
     return () => clearTimeout(blinkTimeoutRef.current);
   }, []);
 
-  // --- Mouth animation only while TALKING ---
+  // ✅ Mouth animation only while TALKING
   useEffect(() => {
     if (state !== AVATAR_STATE.TALKING) {
       setMouthFrame(0);
       return;
     }
-    const t = setInterval(() => {
-      setMouthFrame((m) => (m + 1) % 3);
-    }, 110);
+    const t = setInterval(() => setMouthFrame((m) => (m + 1) % 3), 110);
     return () => clearInterval(t);
   }, [state]);
 
@@ -50,41 +47,47 @@ export default function AvatarOverlay({ state }) {
     return LAYERS.mouth0;
   }, [mouthFrame]);
 
-  // --- Motion presets per state (pro-feel) ---
+  // ✅ Whole avatar subtle motion (body+face together)
   const stackMotion =
     state === AVATAR_STATE.IDLE
-      ? {
-          y: [0, -5, 0],
-          rotate: [0, 0.6, 0],
-        }
+      ? { y: [0, -5, 0], rotate: [0, 0.5, 0] }
       : state === AVATAR_STATE.LISTENING
-      ? {
-          scale: [1, 1.02, 1],
-          rotate: [0, -0.9, 0],
-        }
+      ? { scale: [1, 1.02, 1] }
       : state === AVATAR_STATE.TALKING
-      ? {
-          y: [0, -2, 0],
-          rotate: [0, 0.4, 0],
-        }
-      : {
-          y: 0,
-          rotate: 0,
-          scale: 1,
-        };
+      ? { y: [0, -2, 0] }
+      : { y: 0, rotate: 0, scale: 1 };
 
   const stackTransition =
     state === AVATAR_STATE.LISTENING
-      ? { repeat: Infinity, duration: 0.95, ease: "easeInOut" }
+      ? { repeat: Infinity, duration: 1.0, ease: "easeInOut" }
       : state === AVATAR_STATE.TALKING
-      ? { repeat: Infinity, duration: 0.75, ease: "easeInOut" }
+      ? { repeat: Infinity, duration: 0.8, ease: "easeInOut" }
       : state === AVATAR_STATE.IDLE
       ? { repeat: Infinity, duration: 2.2, ease: "easeInOut" }
       : { duration: 0.25 };
 
+  // ✅ FaceGroup motion (HEAD+EYES+MOUTH together)
+  const faceMotion =
+    state === AVATAR_STATE.IDLE
+      ? { rotate: [0, -0.7, 0], y: [0, -1, 0] }
+      : state === AVATAR_STATE.LISTENING
+      ? { rotate: [0, -1.2, 0], scale: [1, 1.01, 1] }
+      : state === AVATAR_STATE.TALKING
+      ? { rotate: [0, 0.6, 0], y: [0, -1.5, 0] }
+      : { rotate: 0, y: 0, scale: 1 };
+
+  const faceTransition =
+    state === AVATAR_STATE.LISTENING
+      ? { repeat: Infinity, duration: 0.9, ease: "easeInOut" }
+      : state === AVATAR_STATE.TALKING
+      ? { repeat: Infinity, duration: 0.65, ease: "easeInOut" }
+      : state === AVATAR_STATE.IDLE
+      ? { repeat: Infinity, duration: 2.6, ease: "easeInOut" }
+      : { duration: 0.25 };
+
   return (
     <div style={styles.stage}>
-      {/* CSS Listening ring (no PNG needed) */}
+      {/* Listening ring (CSS, no PNG needed) */}
       {state === AVATAR_STATE.LISTENING && (
         <motion.div
           style={styles.ringCss}
@@ -93,42 +96,28 @@ export default function AvatarOverlay({ state }) {
         />
       )}
 
-      {/* Extra subtle ambient glow always */}
       <div style={styles.ambientGlow} />
 
-      {/* Whole avatar stack motion */}
       <motion.div style={styles.stack} animate={stackMotion} transition={stackTransition}>
-        {/* Body stays stable (feels grounded) */}
+        {/* BODY */}
         <img src={LAYERS.body} alt="body" style={styles.layer} />
 
-        {/* Head can have a tiny independent micro-motion for realism */}
-        <motion.img
-          src={LAYERS.head}
-          alt="head"
-          style={styles.layer}
-          animate={
-            state === AVATAR_STATE.IDLE
-              ? { rotate: [0, -0.4, 0] }
-              : state === AVATAR_STATE.TALKING
-              ? { rotate: [0, 0.35, 0] }
-              : { rotate: 0 }
-          }
-          transition={{
-            repeat: state === AVATAR_STATE.IDLE || state === AVATAR_STATE.TALKING ? Infinity : 0,
-            duration: state === AVATAR_STATE.TALKING ? 0.65 : 2.6,
-            ease: "easeInOut",
-          }}
-        />
-
-        {/* Eyes (blink swap) */}
-        <img
-          src={blink ? LAYERS.eyesClosed : LAYERS.eyesOpen}
-          alt="eyes"
-          style={styles.layer}
-        />
-
-        {/* Mouth (talk frames) */}
-        <img src={mouthSrc} alt="mouth" style={styles.layer} />
+        {/* ✅ FACE GROUP: head + eyes + mouth move together */}
+        <motion.div
+          style={styles.faceGroup}
+          animate={faceMotion}
+          transition={faceTransition}
+          // makes rotation feel like it's from neck area
+          style={{ ...styles.faceGroup, transformOrigin: "50% 65%" }}
+        >
+          <img src={LAYERS.head} alt="head" style={styles.layer} />
+          <img
+            src={blink ? LAYERS.eyesClosed : LAYERS.eyesOpen}
+            alt="eyes"
+            style={styles.layer}
+          />
+          <img src={mouthSrc} alt="mouth" style={styles.layer} />
+        </motion.div>
       </motion.div>
     </div>
   );
@@ -143,8 +132,6 @@ const styles = {
     overflow: "hidden",
     position: "relative",
   },
-
-  // Subtle glow behind avatar always
   ambientGlow: {
     position: "absolute",
     width: 560,
@@ -152,11 +139,9 @@ const styles = {
     borderRadius: "50%",
     background: "radial-gradient(circle, rgba(0,255,180,0.13), rgba(0,0,0,0))",
     filter: "blur(6px)",
-    opacity: 0.8,
+    opacity: 0.85,
     pointerEvents: "none",
   },
-
-  // Listening ring (CSS)
   ringCss: {
     position: "absolute",
     width: 560,
@@ -166,14 +151,17 @@ const styles = {
     boxShadow: "0 0 45px rgba(0, 255, 180, 0.35)",
     pointerEvents: "none",
   },
-
-  // Stack size: adjust for your avatar scale
   stack: {
     position: "relative",
     width: 420,
     height: 420,
   },
-
+  faceGroup: {
+    position: "absolute",
+    inset: 0,
+    width: "100%",
+    height: "100%",
+  },
   layer: {
     position: "absolute",
     inset: 0,
