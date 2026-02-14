@@ -30,6 +30,13 @@ export default function AvatarOverlay({ state }) {
     scheduleBlink();
     return () => clearTimeout(blinkTimeoutRef.current);
   }, []);
+  // 15% chance of a quick double blink
+if (Math.random() < 0.15) {
+    setTimeout(() => {
+      setBlink(true);
+      setTimeout(() => setBlink(false), 180);
+    }, 260);
+  }
 
   // ✅ Mouth animation only while TALKING
   useEffect(() => {
