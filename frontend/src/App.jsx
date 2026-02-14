@@ -1,62 +1,54 @@
 import React, { useEffect, useState } from "react";
 import AvatarStage from "./components/avatar/AvatarStage";
-import { AVATAR_STATE } from "./components/avatar/avatarStates";
 
 export default function App() {
-  const [avatarState, setAvatarState] = useState(AVATAR_STATE.IDLE);
-  const [lastMessage, setLastMessage] = useState("");
+  const [systemState, setSystemState] = useState({
+    mode: "IDLE",
+    avatar_state: "SLEEP",
+    subtitle: ""
+  });
 
   useEffect(() => {
     const WS_URL = "ws://localhost:8000/ws";
-    const socket = new WebSocket(WS_URL);
+    let socket;
 
-    socket.onopen = () => {
-      console.log("✅ WebSocket connected");
-      setAvatarState(AVATAR_STATE.IDLE);
-    };
+    const connectWS = () => {
+      socket = new WebSocket(WS_URL);
 
-    socket.onmessage = (event) => {
-      console.log("📩 WS message:", event.data);
-      setLastMessage(event.data);
-
-      try {
-        const data = JSON.parse(event.data);
-
-        if (data.action === "wake") {
-          setAvatarState(AVATAR_STATE.LISTENING);
-        } 
-        else if (data.action === "talk") {
-          setAvatarState(AVATAR_STATE.TALKING);
-        } 
-        else if (data.action === "idle") {
-          setAvatarState(AVATAR_STATE.IDLE);
-        } 
-        else if (
-          typeof data.action === "string" &&
-          data.action.includes("play")
-        ) {
-          setAvatarState(AVATAR_STATE.SHOW_AD);
-        } 
-        else {
-          setAvatarState(AVATAR_STATE.IDLE);
+      socket.onopen = () => console.log("✅ Adorix Backend Connected");
+      
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("📩 State Update:", data);
+          setSystemState(data);
+        } catch (err) {
+          console.error("Failed to parse WS message", err);
         }
+      };
 
-      } catch {
-        // ignore if not valid JSON
-      }
+      socket.onclose = () => {
+        console.log("🔌 Disconnected. Retrying in 3s...");
+        setTimeout(connectWS, 3000);
+      };
     };
 
-    socket.onerror = () => {
-      console.log("❌ WebSocket error (backend not running yet)");
-      setAvatarState(AVATAR_STATE.ERROR);
-    };
-
-    socket.onclose = () => {
-      console.log("🔌 WebSocket disconnected");
-    };
-
-    return () => socket.close();
+    connectWS();
+    return () => socket?.close();
   }, []);
 
-  return <AvatarStage state={avatarState} lastMessage={lastMessage} />;
+  return (
+    <div className="kiosk-container" style={{ background: "#070b12" }}>
+      {/* Show Avatar in both IDLE and INTERACTION modes, control internal state via system_state */}
+      <AvatarStage 
+        externalState={systemState.avatar_state} 
+        externalSubtitle={systemState.subtitle}
+      />
+
+      {/* HUD / Status for Debug */}
+      <div style={{ position: "fixed", bottom: 10, left: 10, fontSize: 12, opacity: 0.3, color: "white" }}>
+        Adorix System | Mode: {systemState.mode} | State: {systemState.avatar_state}
+      </div>
+    </div>
+  );
 }

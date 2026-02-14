@@ -14,33 +14,11 @@ class BrainEngine:
         )
         print("✅ TinyLlama loaded successfully!")
 
-    def load_ad_context(self, ad_name):
-        """Reads the JSON file and returns the context for the specific ad."""
-        # Get the absolute path to the JSON file (keeps it safe from folder-switching errors)
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        json_path = os.path.join(base_dir, 'ads_metadata.json')
-
-        try:
-            with open(json_path, 'r') as file:
-                data = json.load(file)
-                
-            # Check if the ad exists in our JSON
-            if ad_name in data:
-                return data[ad_name]["context"]
-            else:
-                return None
-        except FileNotFoundError:
-            print(f"❌ Error: Could not find {json_path}")
-            return None
-
-    def generate_answer(self, user_question, current_ad_name):
-        """Uses TinyLlama to answer based ONLY on the JSON context."""
+    def generate_answer(self, user_question, context):
+        """Uses TinyLlama to answer based ONLY on the provided context string."""
         
-        # 1. Fetch the exact context from the JSON file
-        context = self.load_ad_context(current_ad_name)
-
         if not context:
-            return "I'm sorry, I don't have information on this product right now."
+            return "I'm sorry, I don't have enough information to answer that right now."
 
         # 2. Strict Prompt Engineering (RAG format)
         # We explicitly tell it to ONLY use the context.
@@ -86,9 +64,9 @@ class BrainEngine:
 # --- GLOBAL INSTANCE ---
 adorix_brain = BrainEngine()
 
-def get_answer_from_data(user_question, current_ad_name):
+def get_answer_from_data(user_question, context):
     """Wrapper function to be called by your interaction_manager"""
-    return adorix_brain.generate_answer(user_question, current_ad_name)
+    return adorix_brain.generate_answer(user_question, context)
 
 # --- TEST CODE (Run this directly to check if it reads the JSON) ---
 if __name__ == "__main__":
