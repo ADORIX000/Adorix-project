@@ -25,11 +25,9 @@ export default function AvatarOverlay({ state }) {
       const next = 2200 + Math.random() * 2200; // 2.2s - 4.4s
 
       blinkTimeoutRef.current = setTimeout(() => {
-        // main blink
         setBlink(true);
         setTimeout(() => setBlink(false), 200);
 
-        // 15% chance of quick double blink
         if (Math.random() < 0.15) {
           doubleBlinkTimeoutRef.current = setTimeout(() => {
             setBlink(true);
@@ -65,7 +63,7 @@ export default function AvatarOverlay({ state }) {
     return LAYERS.mouth0;
   }, [mouthFrame]);
 
-  // ✅ Whole avatar subtle motion (keep very light)
+  // ✅ Whole avatar subtle motion
   const stackMotion =
     state === AVATAR_STATE.IDLE
       ? { y: [0, -3, 0] }
@@ -84,15 +82,15 @@ export default function AvatarOverlay({ state }) {
       ? { repeat: Infinity, duration: 2.8, ease: "easeInOut" }
       : { duration: 0.25 };
 
-  // ✅ FaceGroup motion (SUBTLE head movement)
+  // ✅ Face motion: SMALL neck tilt (less separation)
   const faceMotion =
     state === AVATAR_STATE.IDLE
-      ? { rotate: [0, -0.25, 0], y: [0, -0.6, 0] }
+      ? { rotate: [0, -0.18, 0] }
       : state === AVATAR_STATE.LISTENING
-      ? { rotate: [0, -0.4, 0], scale: [1, 1.006, 1] }
+      ? { rotate: [0, -0.25, 0], scale: [1, 1.004, 1] }
       : state === AVATAR_STATE.TALKING
-      ? { rotate: [0, 0.25, 0], y: [0, -0.8, 0] }
-      : { rotate: 0, y: 0, scale: 1 };
+      ? { rotate: [0, 0.18, 0] }
+      : { rotate: 0, scale: 1 };
 
   const faceTransition =
     state === AVATAR_STATE.LISTENING
@@ -117,8 +115,31 @@ export default function AvatarOverlay({ state }) {
       <div style={styles.ambientGlow} />
 
       <motion.div style={styles.stack} animate={stackMotion} transition={stackTransition}>
-        {/* BODY */}
-        <img src={LAYERS.body} alt="body" style={styles.layer} />
+        {/* ✅ BODY follows slightly to hide neck seam */}
+        <motion.img
+          src={LAYERS.body}
+          alt="body"
+          style={styles.layer}
+          animate={
+            state === AVATAR_STATE.IDLE
+              ? { y: [0, -0.6, 0] }
+              : state === AVATAR_STATE.LISTENING
+              ? { y: [0, -0.4, 0] }
+              : state === AVATAR_STATE.TALKING
+              ? { y: [0, -0.5, 0] }
+              : { y: 0 }
+          }
+          transition={{
+            repeat:
+              state === AVATAR_STATE.IDLE ||
+              state === AVATAR_STATE.LISTENING ||
+              state === AVATAR_STATE.TALKING
+                ? Infinity
+                : 0,
+            duration: 3.0,
+            ease: "easeInOut",
+          }}
+        />
 
         {/* FACE GROUP: head + eyes + mouth move together */}
         <motion.div style={styles.faceGroup} animate={faceMotion} transition={faceTransition}>
@@ -173,7 +194,7 @@ const styles = {
     inset: 0,
     width: "100%",
     height: "100%",
-    transformOrigin: "50% 65%",
+    transformOrigin: "50% 72%", // ✅ lower = neck pivot
   },
   layer: {
     position: "absolute",
