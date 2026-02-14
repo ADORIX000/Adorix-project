@@ -1,82 +1,143 @@
 import json
-import torch
 import os
+import torch
 from transformers import pipeline
 
 class BrainEngine:
     def __init__(self):
-        print("🧠 Loading TinyLlama... (This might take a minute)")
+        """
+        Initializes the AI Brain using TinyLlama for RAG.
+        """
+        print("🧠 [Brain] Loading AI Engine (TinyLlama)...")
+        # Initialize the text-generation pipeline
+        # We use float16 and low_cpu_mem_usage for faster loading and less memory
         self.pipe = pipeline(
-            "text-generation", 
-            model="TinyLlama/TinyLlama-1.1B-Chat-v1.0", 
-            torch_dtype=torch.bfloat16, 
-            device_map="auto" 
+            "text-generation",
+            model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+            model_kwargs={
+                "torch_dtype": torch.float16,
+                "low_cpu_mem_usage": True,
+            },
+            device_map="auto"
         )
-        print("✅ TinyLlama loaded successfully!")
+        print("✅ [Brain] AI Engine loaded successfully.")
+
+    def load_context_from_json(self, json_filename):
+        """
+        Loads the product description context from a specific JSON file.
+        """
+        # Ensure the filename has .json extension
+        if not json_filename.endswith(".json"):
+            json_filename += ".json"
+            
+        # Path: backend/modules/interaction/data/{json_filename}
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        json_path = os.path.join(base_dir, "data", json_filename)
+        
+        try:
+            with open(json_path, 'r') as f:
+                data = json.load(f)
+                # We expect the JSON to have a "context" field
+                context = data.get("context", "")
+                product_name = data.get("product", "this product")
+                print(f">>> [Brain] Loaded knowledge for: {product_name}")
+                return context
+        except FileNotFoundError:
+            print(f"!!! [Brain] Error: Knowledge file {json_path} not found.")
+            return None
+        except Exception as e:
+            print(f"!!! [Brain] Error loading JSON: {e}")
+            return None
 
     def generate_answer(self, user_question, context):
-        """Uses TinyLlama to answer based ONLY on the provided context string."""
-        
+        """
+        Generates a concise answer based ONLY on the provided context.
+        """
         if not context:
-            return "I'm sorry, I don't have enough information to answer that right now."
+            return "I'm sorry, I don't have enough information about that right now."
 
-        # 2. Strict Prompt Engineering (RAG format)
-        # We explicitly tell it to ONLY use the context.
+        import time
+        start_time = time.time()
+        
+        # Construct a strict prompt for RAG
         messages = [
             {
                 "role": "system",
                 "content": (
-                    "You are ADORIX, a helpful kiosk assistant. "
-                    "You must answer the user's question using ONLY the provided Context. "
-                    "Keep your answer short, conversational, and direct. "
-                    "If the answer is not in the Context, say 'I am not sure about that'."
+                    "You are Adorix, a friendly AI kiosk assistant. "
+                    "Use ONLY the following context to answer the user's question. "
+                    "Keep your response very short (1-2 sentences), conversational, and informative. "
+                    "If the answer is not in the context, say 'I'm sorry, I don't have that information'."
                 )
             },
             {
                 "role": "user",
                 "content": f"Context: {context}\n\nQuestion: {user_question}"
-            },
+            }
         ]
 
-        # 3. Format for TinyLlama
-        prompt = self.pipe.tokenizer.apply_chat_template(
-            messages, 
-            tokenize=False, 
-            add_generation_prompt=True
-        )
-        
-        # 4. Generate the Answer
-        outputs = self.pipe(
-            prompt, 
-            max_new_tokens=50,   
-            do_sample=True, 
-            temperature=0.1,  # Keep temperature very low (0.1) so it doesn't invent fake colors
-            top_k=50, 
-            top_p=0.95
-        )
+        try:
+            # Use the chat template provided by the model tokenizer
+            prompt = self.pipe.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True
+            )
 
-        generated_text = outputs[0]["generated_text"]
-        # Split the text to only get the AI's response part
-        answer = generated_text.split("<|assistant|>")[-1].strip()
-        
-        return answer
+            # Generate response
+            outputs = self.pipe(
+                prompt,
+                max_new_tokens=80,
+                do_sample=True,
+                temperature=0.1, # Even lower for consistency
+                top_k=50,
+                top_p=0.9
+            )
 
-# --- GLOBAL INSTANCE ---
+            # Extract answer from generated text
+            full_text = outputs[0]["generated_text"]
+            
+            # TinyLlama implementation of apply_chat_template usually ends with <|assistant|>
+            if "<|assistant|>" in full_text:
+                answer = full_text.split("<|assistant|>")[-1].strip()
+            else:
+                # Fallback if template markers are missing
+                answer = full_text.split(user_question)[-1].strip()
+
+            # Remove common prefixes if they appear
+            for prefix in ["Answer:", "Response:", "Adorix:"]:
+                if answer.startswith(prefix):
+                    answer = answer[len(prefix):].strip()
+
+            end_time = time.time()
+            print(f">>> [Brain] Answer generated in {end_time - start_time:.2f}s")
+            return answer
+        except Exception as e:
+            print(f"!!! [Brain] Generation error: {e}")
+            return "I'm sorry, I encountered an error while thinking about your question."
+
+# Global instance
 adorix_brain = BrainEngine()
 
-def get_answer_from_data(user_question, context):
-    """Wrapper function to be called by your interaction_manager"""
+def get_answer_for_product(user_question, json_file):
+    """
+    Wrapper function called by the interaction manager.
+    """
+    context = adorix_brain.load_context_from_json(json_file)
     return adorix_brain.generate_answer(user_question, context)
 
-# --- TEST CODE (Run this directly to check if it reads the JSON) ---
 if __name__ == "__main__":
-    print("\n--- Testing JSON RAG Engine ---")
+    # Test script: Create a dummy JSON first
+    data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+    os.makedirs(data_dir, exist_ok=True)
     
-    # Simulate the user looking at the Nike Ad
-    ad_playing_on_screen = "Nike Ad" 
-    
-    question = "what are the available colours"
-    print(f"User asks: '{question}' while watching '{ad_playing_on_screen}'")
-    
-    final_answer = get_answer_from_data(question, ad_playing_on_screen)
-    print(f"\n🤖 ADORIX Replies: {final_answer}")
+    test_data = {
+        "product": "Adorix Kiosk",
+        "context": "Adorix is a futuristic AI kiosk with a 3D avatar. It provides personalized product recommendations and costs 1,000 USD."
+    }
+    with open(os.path.join(data_dir, "test_ad.json"), 'w') as f:
+        json.dump(test_data, f)
+        
+    print("Testing Brain Engine...")
+    ans = get_answer_for_product("How much does the kiosk cost?", "test_ad.json")
+    print(f"AI Answer: {ans}")

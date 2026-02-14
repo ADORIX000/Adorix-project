@@ -42,15 +42,16 @@ class WakeWordService:
             print(f">>> [Wake Word] Service Started. Listening for 'Hey Adorix'...")
 
             while not self.stop_program:
-                pcm = self.recorder.read()
-                result = self.porcupine.process(pcm)
+                if self.recorder and self.porcupine:
+                    pcm = self.recorder.read()
+                    result = self.porcupine.process(pcm)
 
-                if result >= 0:
-                    print("!!! WAKE WORD DETECTED !!!")
-                    if self.callback:
-                        self.callback()
-                    else:
-                        print("(No callback defined for wake word)")
+                    if result >= 0:
+                        print("!!! WAKE WORD DETECTED !!!")
+                        if self.callback:
+                            self.callback()
+                        else:
+                            print("(No callback defined for wake word)")
                 
                 # Small sleep to prevent high CPU usage if needed, 
                 # but process() is usually blocking/timed.

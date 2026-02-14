@@ -1,37 +1,34 @@
 import time
 from tts_engine import speak
 from stt_engine import listen_one_phrase
-from brain_engine import get_answer_from_data
+from brain_engine import get_answer_for_product
 
-def start_interaction_loop(current_product_data):
+def start_interaction_loop(current_ad_name):
     """
-    Controls the entire conversation flow.
-    Returns "TIMEOUT" when the conversation ends naturally.
+    This is the core loop that keeps Adorix talking to the user.
     """
+    # 1. Initial Greeting
+    speak("Hello! I'm Adorix. I saw you were looking at this ad. Do you have any questions for me?")
     
-    # 1. Initial Greeting (Triggered when switching modes)
-    speak("Hey, how can I help you?")
-    
-    # 2. Start the Loop
+    # 2. Enter the continuous listening loop
     while True:
-        # A. Listen for 5 seconds
-        user_text = listen_one_phrase(timeout=5)
+        print(">>> [System] Listening for user question...")
+        # Listen for exactly 5 seconds
+        user_question = listen_one_phrase(timeout=5)
         
-        # B. Check for Silence (Timeout)
-        if user_text is None:
-            # Logic: If nothing detected in 5s -> End Interaction
-            print("Interaction: Time out detected.")
-            speak("Have a nice day!")
-            return "TIMEOUT" # Signal to Main to go back to Loop Mode
+        # 3. Handle Silence (The 5-second Timeout)
+        if user_question is None:
+            print(">>> [System] 5 seconds of silence detected. Ending interaction.")
+            speak("Have a nice day! I'll go back to the ads now.")
+            return "GOTO_LOOP" # This tells main.py to switch modes
+            
+        # 4. Handle Active Speech
+        print(f">>> [User] Question: {user_question}")
         
-        # C. User spoke! Process the question
-        print(f"Interaction: User asked -> {user_text}")
+        # 5. Get Answer from TinyLlama + JSON
+        answer = get_answer_from_data(user_question, current_ad_name)
         
-        # D. Get Answer from Brain (JSON Data)
-        answer = get_answer_from_data(user_text, current_product_data)
-        
-        # E. Speak the Answer
+        # 6. Speak the Answer
         speak(answer)
         
-        # F. Loop restarts immediately to listen for the next question...
-        # (It will go back to step A)
+        # The loop now repeats, going back to 'listen_one_phrase' automatically!
