@@ -15,28 +15,39 @@ const LAYERS = {
 export default function AvatarOverlay({ state }) {
   const [blink, setBlink] = useState(false);
   const [mouthFrame, setMouthFrame] = useState(0);
-  const blinkTimeoutRef = useRef(null);
 
-  // ✅ Blink loop (random-ish + visible)
+  const blinkTimeoutRef = useRef(null);
+  const doubleBlinkTimeoutRef = useRef(null);
+
+  // ✅ Blink loop (random-ish + visible) + occasional double blink
   useEffect(() => {
     const scheduleBlink = () => {
       const next = 2200 + Math.random() * 2200; // 2.2s - 4.4s
+
       blinkTimeoutRef.current = setTimeout(() => {
+        // main blink
         setBlink(true);
         setTimeout(() => setBlink(false), 220);
+
+        // 15% chance of quick double blink (scheduled AFTER first blink)
+        if (Math.random() < 0.15) {
+          doubleBlinkTimeoutRef.current = setTimeout(() => {
+            setBlink(true);
+            setTimeout(() => setBlink(false), 180);
+          }, 260);
+        }
+
         scheduleBlink();
       }, next);
     };
+
     scheduleBlink();
-    return () => clearTimeout(blinkTimeoutRef.current);
+
+    return () => {
+      clearTimeout(blinkTimeoutRef.current);
+      clearTimeout(doubleBlinkTimeoutRef.current);
+    };
   }, []);
-  // 15% chance of a quick double blink
-if (Math.random() < 0.15) {
-    setTimeout(() => {
-      setBlink(true);
-      setTimeout(() => setBlink(false), 180);
-    }, 260);
-  }
 
   // ✅ Mouth animation only while TALKING
   useEffect(() => {
@@ -114,8 +125,6 @@ if (Math.random() < 0.15) {
           style={styles.faceGroup}
           animate={faceMotion}
           transition={faceTransition}
-          // makes rotation feel like it's from neck area
-          style={{ ...styles.faceGroup, transformOrigin: "50% 65%" }}
         >
           <img src={LAYERS.head} alt="head" style={styles.layer} />
           <img
@@ -168,6 +177,7 @@ const styles = {
     inset: 0,
     width: "100%",
     height: "100%",
+    transformOrigin: "50% 65%", // neck pivot
   },
   layer: {
     position: "absolute",
