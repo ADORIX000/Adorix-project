@@ -1,62 +1,53 @@
-import React, { useEffect, useState } from "react";
-import AvatarStage from "./components/avatar/AvatarStage";
-import { AVATAR_STATE } from "./components/avatar/avatarStates";
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 
-export default function App() {
-  const [avatarState, setAvatarState] = useState(AVATAR_STATE.IDLE);
-  const [lastMessage, setLastMessage] = useState("");
+// Import Components
+import LoopMode from './components/LoopMode';
+import DeliveryMode from './components/DeliveryMode';
+import AvatarMode from './components/AvatarMode';
 
+function App() {
+  const [systemState, setSystemState] = useState({
+    mode: "LOOP",
+    video: "default_loop.mp4",
+    avatar_speaking: false,
+    avatar_message: ""
+  });
+
+  // Poll Backend every 500ms
   useEffect(() => {
-    const WS_URL = "ws://localhost:8000/ws";
-    const socket = new WebSocket(WS_URL);
-
-    socket.onopen = () => {
-      console.log("✅ WebSocket connected");
-      setAvatarState(AVATAR_STATE.IDLE);
-    };
-
-    socket.onmessage = (event) => {
-      console.log("📩 WS message:", event.data);
-      setLastMessage(event.data);
-
+    const interval = setInterval(async () => {
       try {
-        const data = JSON.parse(event.data);
-
-        if (data.action === "wake") {
-          setAvatarState(AVATAR_STATE.LISTENING);
-        } 
-        else if (data.action === "talk") {
-          setAvatarState(AVATAR_STATE.TALKING);
-        } 
-        else if (data.action === "idle") {
-          setAvatarState(AVATAR_STATE.IDLE);
-        } 
-        else if (
-          typeof data.action === "string" &&
-          data.action.includes("play")
-        ) {
-          setAvatarState(AVATAR_STATE.SHOW_AD);
-        } 
-        else {
-          setAvatarState(AVATAR_STATE.IDLE);
-        }
-
-      } catch {
-        // ignore if not valid JSON
+        const res = await axios.get('http://localhost:5000/status');
+        setSystemState(res.data);
+      } catch (err) {
+        console.error("Backend Disconnected");
       }
-    };
-
-    socket.onerror = () => {
-      console.log("❌ WebSocket error (backend not running yet)");
-      setAvatarState(AVATAR_STATE.ERROR);
-    };
-
-    socket.onclose = () => {
-      console.log("🔌 WebSocket disconnected");
-    };
-
-    return () => socket.close();
+    }, 500);
+    return () => clearInterval(interval);
   }, []);
 
-  return <AvatarStage state={avatarState} lastMessage={lastMessage} />;
+  return (
+    <div className="w-screen h-screen bg-black overflow-hidden">
+      {/* 1. LOOP MODE */}
+      {systemState.mode === "LOOP" && (
+        <LoopMode />
+      )}
+
+      {/* 2. DELIVERY MODE (Personalized Ad) */}
+      {systemState.mode === "DELIVERY" && (
+        <DeliveryMode videoFile={systemState.video} />
+      )}
+
+      {/* 3. INTERACTION MODE (Avatar) */}
+      {systemState.mode === "INTERACTION" && (
+        <AvatarMode 
+          isSpeaking={systemState.avatar_speaking} 
+          message={systemState.avatar_message} 
+        />
+      )}
+    </div>
+  );
 }
+
+export default App;
