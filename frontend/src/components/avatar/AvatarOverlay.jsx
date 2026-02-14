@@ -19,10 +19,10 @@ export default function AvatarOverlay({ state }) {
   const blinkTimeoutRef = useRef(null);
   const doubleBlinkTimeoutRef = useRef(null);
 
-  // ✅ Blink loop (random-ish + visible) + occasional double blink
+  // Blink loop
   useEffect(() => {
     const scheduleBlink = () => {
-      const next = 2200 + Math.random() * 2200; // 2.2s - 4.4s
+      const next = 2200 + Math.random() * 2200;
 
       blinkTimeoutRef.current = setTimeout(() => {
         setBlink(true);
@@ -47,7 +47,7 @@ export default function AvatarOverlay({ state }) {
     };
   }, []);
 
-  // ✅ Mouth animation only while TALKING
+  // Mouth animation
   useEffect(() => {
     if (state !== AVATAR_STATE.TALKING) {
       setMouthFrame(0);
@@ -63,7 +63,6 @@ export default function AvatarOverlay({ state }) {
     return LAYERS.mouth0;
   }, [mouthFrame]);
 
-  // ✅ Whole avatar subtle motion
   const stackMotion =
     state === AVATAR_STATE.IDLE
       ? { y: [0, -3, 0] }
@@ -82,7 +81,6 @@ export default function AvatarOverlay({ state }) {
       ? { repeat: Infinity, duration: 2.8, ease: "easeInOut" }
       : { duration: 0.25 };
 
-  // ✅ Face motion: SMALL neck tilt (less separation)
   const faceMotion =
     state === AVATAR_STATE.IDLE
       ? { rotate: [0, -0.18, 0] }
@@ -106,7 +104,24 @@ export default function AvatarOverlay({ state }) {
       <div style={styles.ambientGlow} />
 
       <motion.div style={styles.stack} animate={stackMotion} transition={stackTransition}>
-        {/* ✅ LISTENING: avatar-shaped glow (silhouette) */}
+        
+        {/* 🔵 Blue oval ring */}
+        {state === AVATAR_STATE.LISTENING && (
+          <motion.div
+            style={styles.ovalRing}
+            animate={{
+              scale: [1, 1.05, 1],
+              opacity: [0.5, 0.9, 0.5],
+            }}
+            transition={{
+              repeat: Infinity,
+              duration: 1.1,
+              ease: "easeInOut",
+            }}
+          />
+        )}
+
+        {/* ✨ Avatar-shaped glow */}
         {state === AVATAR_STATE.LISTENING && (
           <motion.img
             src={LAYERS.body}
@@ -120,20 +135,21 @@ export default function AvatarOverlay({ state }) {
           />
         )}
 
-        {/* ✅ BODY follows slightly to hide neck seam */}
+        {/* BODY */}
         <motion.img
           src={LAYERS.body}
           alt="body"
           style={styles.layer}
-          animate={
-            state === AVATAR_STATE.IDLE
-              ? { y: [0, -0.6, 0] }
-              : state === AVATAR_STATE.LISTENING
-              ? { y: [0, -0.4, 0] }
-              : state === AVATAR_STATE.TALKING
-              ? { y: [0, -0.5, 0] }
-              : { y: 0 }
-          }
+          animate={{
+            y:
+              state === AVATAR_STATE.IDLE
+                ? [0, -0.6, 0]
+                : state === AVATAR_STATE.LISTENING
+                ? [0, -0.4, 0]
+                : state === AVATAR_STATE.TALKING
+                ? [0, -0.5, 0]
+                : 0,
+          }}
           transition={{
             repeat:
               state === AVATAR_STATE.IDLE ||
@@ -146,7 +162,7 @@ export default function AvatarOverlay({ state }) {
           }}
         />
 
-        {/* FACE GROUP: head + eyes + mouth move together */}
+        {/* FACE GROUP */}
         <motion.div style={styles.faceGroup} animate={faceMotion} transition={faceTransition}>
           <img src={LAYERS.head} alt="head" style={styles.layer} />
           <img
@@ -185,8 +201,15 @@ const styles = {
     width: 420,
     height: 420,
   },
-
-  // ✅ Avatar-shaped glow (same silhouette)
+  ovalRing: {
+    position: "absolute",
+    width: 440,
+    height: 520,
+    borderRadius: "50%",
+    border: "3px solid rgba(0, 150, 255, 0.65)",
+    boxShadow: "0 0 25px rgba(0, 150, 255, 0.4)",
+    pointerEvents: "none",
+  },
   glowSilhouette: {
     position: "absolute",
     inset: 0,
@@ -198,13 +221,12 @@ const styles = {
     transform: "scale(1.06)",
     pointerEvents: "none",
   },
-
   faceGroup: {
     position: "absolute",
     inset: 0,
     width: "100%",
     height: "100%",
-    transformOrigin: "50% 72%", // neck pivot
+    transformOrigin: "50% 72%",
   },
   layer: {
     position: "absolute",
