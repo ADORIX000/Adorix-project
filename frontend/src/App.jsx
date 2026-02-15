@@ -5,57 +5,74 @@ import { AVATAR_STATE } from "./components/avatar/avatarStates";
 export default function App() {
   const [avatarState, setAvatarState] = useState(AVATAR_STATE.IDLE);
   const [lastMessage, setLastMessage] = useState("");
+  const [userCount, setUserCount] = useState(0);
 
   useEffect(() => {
     const WS_URL = "ws://localhost:8000/ws";
-    const socket = new WebSocket(WS_URL);
+    let socket;
+    let reconnectTimer;
 
-    socket.onopen = () => {
-      console.log("✅ WebSocket connected");
-      setAvatarState(AVATAR_STATE.IDLE);
-    };
+    const connect = () => {
+      socket = new WebSocket(WS_URL);
 
-    socket.onmessage = (event) => {
-      console.log("📩 WS message:", event.data);
-      setLastMessage(event.data);
+      socket.onopen = () => {
+        console.log("✅ WebSocket connected");
+        setAvatarState(AVATAR_STATE.IDLE);
+      };
 
-      try {
-        const data = JSON.parse(event.data);
+      socket.onmessage = (event) => {
+        console.log("📩 WS message:", event.data);
+        setLastMessage(event.data);
 
-        if (data.action === "wake") {
-          setAvatarState(AVATAR_STATE.LISTENING);
-        } 
-        else if (data.action === "talk") {
-          setAvatarState(AVATAR_STATE.TALKING);
-        } 
-        else if (data.action === "idle") {
-          setAvatarState(AVATAR_STATE.IDLE);
-        } 
-        else if (
-          typeof data.action === "string" &&
-          data.action.includes("play")
-        ) {
-          setAvatarState(AVATAR_STATE.SHOW_AD);
-        } 
-        else {
-          setAvatarState(AVATAR_STATE.IDLE);
+        try {
+          const data = JSON.parse(event.data);
+
+          // Check for ad playback
+          if (data.action === "play_ad" || data.ad) {
+            setAvatarState(AVATAR_STATE.SHOW_AD);
+          } 
+          else if (data.action === "wake") {
+            setAvatarState(AVATAR_STATE.LISTENING);
+          } 
+          else if (data.action === "talk") {
+            setAvatarState(AVATAR_STATE.TALKING);
+          } 
+          else if (data.action === "idle") {
+            setAvatarState(AVATAR_STATE.IDLE);
+          }
+          else if (data.users && data.users.count > 0) {
+            // Users detected - show detection state
+            setUserCount(data.users.count);
+            setAvatarState(AVATAR_STATE.LISTENING);
+          }
+          else {
+            setAvatarState(AVATAR_STATE.IDLE);
+          }
+
+        } catch {
+          // ignore if not valid JSON
         }
+      };
 
-      } catch {
-        // ignore if not valid JSON
-      }
+      socket.onerror = () => {
+        console.log("❌ WebSocket error (backend not running yet)");
+        setAvatarState(AVATAR_STATE.ERROR);
+        // Try to reconnect
+        reconnectTimer = setTimeout(connect, 5000);
+      };
+
+      socket.onclose = () => {
+        console.log("🔌 WebSocket disconnected, reconnecting in 5s...");
+        reconnectTimer = setTimeout(connect, 5000);
+      };
     };
 
-    socket.onerror = () => {
-      console.log("❌ WebSocket error (backend not running yet)");
-      setAvatarState(AVATAR_STATE.ERROR);
-    };
+    connect();
 
-    socket.onclose = () => {
-      console.log("🔌 WebSocket disconnected");
+    return () => {
+      if (socket) socket.close();
+      if (reconnectTimer) clearTimeout(reconnectTimer);
     };
-
-    return () => socket.close();
   }, []);
 
   return <AvatarStage state={avatarState} lastMessage={lastMessage} />;
