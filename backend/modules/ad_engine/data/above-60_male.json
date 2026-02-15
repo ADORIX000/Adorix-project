@@ -1,0 +1,23 @@
+{
+    "product_name": "Titan Heritage Classic Watch",
+    "brand": "Titan",
+    "category": "Watches & Accessories",
+    "target_age_range": "60+",
+    "gender_focus": "Male",
+    "price": "Rs. 24,500",
+    "available_colors": ["Brown Leather", "Black Leather", "Silver Metal", "Gold Metal"],
+    "key_features": [
+      "Easy-to-read dial for everyday use",
+      "Comfortable strap options",
+      "Timeless design suitable for formal and casual wear",
+      "Gift-ready premium presentation"
+    ],
+    "description": "A classic watch designed for timeless style—comfortable, practical, and meaningful for everyday wear.",
+    "faqs": {
+      "is_it_a_good_gift": "Yes, it’s a popular choice for milestone gifts.",
+      "is_it_heavy": "Leather straps are lighter; metal straps feel heavier and more solid.",
+      "is_it_easy_to_read": "Yes, the dial is designed for clear visibility.",
+      "does_it_require_frequent_maintenance": "No, regular battery replacement is usually sufficient.",
+      "is_it_suitable_for_daily_use": "Yes, it is designed for everyday wear."
+    }
+  }

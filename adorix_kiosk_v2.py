@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
-ADORIX - Integrated Kiosk System
-Simplified version with proper threading
+ADORIX - Integrated Kiosk System (v2.2)
+Strict 3-Stage Workflow: Loop -> Personalized -> Interaction.
 """
 
 import os
@@ -9,258 +9,259 @@ import time
 import json
 import cv2
 import threading
-import numpy as np
-from collections import Counter
-from typing import Set
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
+import numpy as np
+from typing import Set
 
+# --- Services ---
 from services.vision.detector import AgeGenderDetector
 from services.ad_engine.selector import AdSelector
+from services.avatar_interaction.wakeword import WakeWordService
+from services.avatar_interaction.stt import listen_one_phrase
+from services.avatar_interaction.tts import speak
+from services.avatar_interaction.brain import adorix_brain
 
 # ============ CONFIG ============
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-SHARED_JSON = os.path.join(PROJECT_ROOT, "shared", "current_users.json")
 RULES_PATH = os.path.join(PROJECT_ROOT, "services", "ad_engine", "rules.json")
 ADS_DIR = os.path.join(PROJECT_ROOT, "services", "ad_engine", "ads")
+DATA_DIR = os.path.join(PROJECT_ROOT, "services", "ad_engine", "data")
 
 # ============ GLOBAL STATE ============
 class KioskState:
     def __init__(self):
         self.current_users = {}
         self.current_ad = None
-        self.detector = None
-        self.selector = None
+        self.mode = "LOOP"  # LOOP, PERSONALIZED, INTERACTION
+        self.avatar_status = "SLEEP"
+        self.product_data = {}
 
 kiosk = KioskState()
 ws_clients: Set = set()
+loop = None
 
-# ============ WEBSOCKET - Proper Async Version ============
+# ============ UTILS ============
+async def broadcast(message: dict):
+    if not ws_clients: return
+    json_msg = json.dumps(message)
+    to_remove = []
+    for ws in ws_clients:
+        try:
+            await ws.send_text(json_msg)
+        except Exception:
+            to_remove.append(ws)
+    for ws in to_remove:
+        ws_clients.discard(ws)
+
+def sync_broadcast(message: dict):
+    global loop
+    if loop and ws_clients:
+        asyncio.run_coroutine_threadsafe(broadcast(message), loop)
+
+def update_avatar(status, subtitle=""):
+    kiosk.avatar_status = status
+    sync_broadcast({
+        "action": "AVATAR_STATUS",
+        "status": status,
+        "subtitle": subtitle
+    })
+
+# ============ INTERACTION LOGIC ============
+wake_word_service = None
+
+def on_wake_word():
+    if kiosk.mode == "INTERACTION": return
+    print(">>> [Interaction] Wake Word Detected!")
+    threading.Thread(target=run_interaction_flow, daemon=True).start()
+
+def run_interaction_flow():
+    global wake_word_service
+    kiosk.mode = "INTERACTION"
+    if wake_word_service: wake_word_service.pause()
+
+    try:
+        # 1. Greeting
+        greeting = "Hello! Do you have a question about this product?"
+        update_avatar("SPEAKING", greeting)
+        speak(greeting)
+
+        while True: # Interaction Loop
+            update_avatar("LISTENING", "Listening...")
+            user_text = listen_one_phrase(timeout=7)
+
+            if user_text:
+                print(f">>> User said: {user_text}")
+                update_avatar("THINKING", f"You: {user_text}")
+                
+                # Context from the specific ad JSON
+                context = json.dumps(kiosk.product_data)
+                answer = adorix_brain.generate_answer(user_text, context)
+                
+                update_avatar("SPEAKING", answer)
+                speak(answer)
+                
+                # Ask if there's anything else
+                # (Optional: user can just say something again without prompt)
+            else:
+                break # No input for 7s -> Exit interaction
+
+    except Exception as e:
+        print(f"!!! Interaction Error: {e}")
+
+    finally:
+        kiosk.mode = "PERSONALIZED"
+        update_avatar("SLEEP", "")
+        if wake_word_service: wake_word_service.resume()
+
+# ============ WEBSOCKET SERVER ============
 async def websocket_server():
-    """Async WebSocket server using built-in asyncio"""
-    from fastapi import FastAPI, WebSocket
+    from fastapi import FastAPI, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
     
     app = FastAPI()
-    
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    
-    @app.get("/")
-    def health():
-        return {"status": "ADORIX running", "version": "1.0"}
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
     
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
         await websocket.accept()
         ws_clients.add(websocket)
-        print("✅ Frontend connection received")
-        
+        print("✅ Frontend Connected")
         try:
+            await websocket.send_json({"action": "MODE_SWITCH", "mode": kiosk.mode, "ad": kiosk.current_ad})
             while True:
-                # Send state updates every 100ms
-                if kiosk.current_ad or kiosk.current_users:
-                    msg = {
-                        "action": "update",
-                        "ad": kiosk.current_ad,
-                        "users": kiosk.current_users
-                    }
-                    await websocket.send_json(msg)
-                
-                await asyncio.sleep(0.1)
-        except Exception as e:
-            pass
-        finally:
+                await websocket.receive_text()
+        except WebSocketDisconnect:
             ws_clients.discard(websocket)
-    
-    # Run with uvicorn
+            print("❌ Frontend Disconnected")
+
     import uvicorn
-    server = uvicorn.Server(uvicorn.Config(
-        app,
-        host="0.0.0.0",
-        port=8000,
-        log_level="critical",
-        access_log=False
-    ))
+    server = uvicorn.Server(uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="critical"))
     await server.serve()
 
-# ============ RUN WEBSOCKET IN THREAD ============
-def run_websocket_in_thread():
-    """Start WebSocket server in a thread"""
-    def run_loop():
+def start_websocket_thread():
+    def run():
+        global loop
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        try:
-            loop.run_until_complete(websocket_server())
-        except KeyboardInterrupt:
-            pass
-        finally:
-            loop.close()
-    
-    thread = threading.Thread(target=run_loop, daemon=True)
-    thread.start()
-    print("🚀 WebSocket server started (port 8000)")
+        loop.run_until_complete(websocket_server())
+    threading.Thread(target=run, daemon=True).start()
+    print("🚀 WebSocket Server Started (Port 8000)")
     time.sleep(1)
 
-# ============ VISION & AD LOOP ============
-def vision_ad_loop():
-    """Main loop - detect users and show ads"""
-    print("📹 Initializing vision system...")
+# ============ VIDEO PLAYER ============
+class VideoPlayer:
+    def __init__(self, window_name):
+        self.window_name = window_name
+        self.cap = None
+        self.current_file = None
+        self.lock = threading.Lock()
     
-    try:
-        # Start detector
-        kiosk.detector = AgeGenderDetector().start(index=0, width=640, height=480)
-        kiosk.selector = AdSelector(RULES_PATH, ADS_DIR)
-        
-        print("✅ Vision system ready")
-        print("📺 Opening display window...")
-        
-        # OpenCV window
-        WIN_NAME = "ADORIX KIOSK"
-        cv2.namedWindow(WIN_NAME, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(WIN_NAME, 1024, 768)
-        
-        # Ad playback
-        current_video_file = None
-        video_cap = None
-        
-        print("\n🎬 Starting main loop (Press Q to quit)\n")
-        
-        while True:
-            # GET FRAME
-            frame = kiosk.detector.update()
-            if frame is None:
-                time.sleep(0.01)
-                continue
+    def play(self, filename):
+        with self.lock:
+            if self.current_file == filename and self.cap and self.cap.isOpened(): return
+            if self.cap: self.cap.release()
             
-            # DETECT USERS
-            now_ts = time.time()
-            users = kiosk.detector.get_committed_people(now_ts)
-            kiosk.current_users = {
-                "count": len(users),
-                "data": users
-            }
-            
-            # SELECT AD
-            payload = {
-                "status": "ACTIVE" if users else "IDLE",
-                "presence": len(kiosk.detector.tracks) > 0,
-                "primary": users[0] if users else None,
-                "people": users
-            }
-            
-            selected_ad = kiosk.selector.choose_ad_filename(payload)
-            kiosk.current_ad = selected_ad
-            
-            # DISPLAY LOGIC
-            display_frame = None
-            
-            if users:  # DETECTING - Show camera
-                display_frame = frame.copy()
-                h, w = display_frame.shape[:2]
-                
-                # Draw user info
-                text = f"Detected {len(users)} user(s)"
-                cv2.putText(display_frame, text, (20, 40), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 2)
-                
-                for i, user in enumerate(users):
-                    y = 80 + (i * 40)
-                    info = f"{user['gender']} - Age {user['age']}"
-                    cv2.putText(display_frame, info, (20, y),
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
-                
-                # Close video
-                if video_cap:
-                    video_cap.release()
-                    video_cap = None
-                    current_video_file = None
-            
-            else:  # IDLE - Play ad video
-                if selected_ad != current_video_file:
-                    if video_cap:
-                        video_cap.release()
-                    
-                    ad_path = os.path.join(ADS_DIR, selected_ad)
-                    if os.path.exists(ad_path):
-                        video_cap = cv2.VideoCapture(ad_path)
-                        current_video_file = selected_ad
-                        print(f"▶️  Playing: {selected_ad}")
-                    else:
-                        print(f"⚠️  Ad not found: {ad_path}")
-                
-                if video_cap and video_cap.isOpened():
-                    ret, ad_frame = video_cap.read()
-                    if ret:
-                        display_frame = ad_frame
-                    else:
-                        # Loop video
-                        video_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                        ret, ad_frame = video_cap.read()
-                        if ret:
-                            display_frame = ad_frame
-                        else:
-                            display_frame = frame
-                else:
-                    display_frame = frame
-            
-            # SHOW WINDOW
-            if display_frame is not None:
-                cv2.imshow(WIN_NAME, display_frame)
-            
-            # CHECK FOR EXIT
-            key = cv2.waitKey(1) & 0xFF
-            if key == ord('q') or key == ord('Q'):
-                print("\n👋 User quit")
-                break
-            
-            time.sleep(0.01)
-    
-    except KeyboardInterrupt:
-        print("\n⏹️  Interrupted by user")
-    except Exception as e:
-        print(f"\n❌ Error in vision loop: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    finally:
-        print("\n🛑 Cleaning up...")
-        if video_cap:
-            video_cap.release()
-        if kiosk.detector:
-            kiosk.detector.stop()
-        cv2.destroyAllWindows()
-        print("✅ Cleanup complete")
+            path = os.path.join(ADS_DIR, filename)
+            if os.path.exists(path):
+                self.cap = cv2.VideoCapture(path)
+                self.current_file = filename
+                print(f"▶️  Playing: {filename}")
+                # Load context
+                data_path = os.path.join(DATA_DIR, filename.replace(".mp4", ".json"))
+                if os.path.exists(data_path):
+                    with open(data_path, "r") as f:
+                        kiosk.product_data = json.load(f)
+                else: kiosk.product_data = {}
+            else: print(f"⚠️  Video not found: {filename}")
 
-# ============ MAIN ============
-def main():
-    print("\n" + "="*70)
-    print("  " + "🎬 ADORIX KIOSK SYSTEM".center(66) + "  ")
-    print("="*70)
-    print()
-    print("  Starting components:")
-    print("    1. Vision detector (camera + face detection)")
-    print("    2. WebSocket server (port 8000)")
-    print("    3. Ad display loop")
-    print()
+    def update(self):
+        with self.lock:
+            if self.cap and self.cap.isOpened():
+                ret, frame = self.cap.read()
+                if ret: return frame
+                else: self.cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        return None
+
+    def stop(self):
+        with self.lock:
+            if self.cap: self.cap.release()
+
+# ============ MAIN LOOP ============
+def main_loop():
+    print("📹 Initializing Vision system...")
+    detector = AgeGenderDetector().start()
+    selector = AdSelector(RULES_PATH, ADS_DIR)
     
-    # Start WebSocket
+    global wake_word_service
+    wake_word_service = WakeWordService(callback_function=on_wake_word)
+    threading.Thread(target=wake_word_service.start, daemon=True).start()
+
+    WIN_NAME = "ADORIX KIOSK"
+    cv2.namedWindow(WIN_NAME, cv2.WINDOW_NORMAL)
+    player = VideoPlayer(WIN_NAME)
+    
+    last_user_ts = 0
+    kiosk.mode = "LOOP"
+
+    print("✅ System Ready (3-Stage Workflow)")
+
     try:
-        run_websocket_in_thread()
-    except Exception as e:
-        print(f"⚠️  WebSocket startup issue: {e}")
-    
-    # Run vision loop (blocking)
-    vision_ad_loop()
-    
-    print("\n" + "="*70)
-    print("  " + "ADORIX KIOSK - STOPPED".center(66) + "  ")
-    print("="*70 + "\n")
+        while True:
+            frame = detector.update()
+            if frame is None: time.sleep(0.01); continue
+
+            now_ts = time.time()
+            users = detector.get_committed_people(now_ts)
+            
+            # --- State Machine ---
+            if kiosk.mode == "LOOP":
+                if users:
+                    print(">>> [State] LOOP -> PERSONALIZED")
+                    kiosk.mode = "PERSONALIZED"
+                    last_user_ts = now_ts
+                    ad = selector.choose_ad_filename({"primary": users[0], "status": "ACTIVE"})
+                    kiosk.current_ad = ad
+                    player.play(ad)
+                    sync_broadcast({"action": "MODE_SWITCH", "mode": "PERSONALIZED", "ad": ad})
+                    wake_word_service.resume()
+                else:
+                    if not kiosk.current_ad:
+                        kiosk.current_ad = selector.choose_ad_filename({"status": "IDLE"})
+                        player.play(kiosk.current_ad)
+            
+            elif kiosk.mode == "PERSONALIZED":
+                if not users:
+                    if now_ts - last_user_ts > 5.0:
+                        print(">>> [State] PERSONALIZED -> LOOP")
+                        kiosk.mode = "LOOP"
+                        kiosk.current_ad = None
+                        wake_word_service.pause()
+                        sync_broadcast({"action": "MODE_SWITCH", "mode": "LOOP"})
+                else:
+                    last_user_ts = now_ts
+
+            # --- Render ---
+            display_frame = None
+            if kiosk.mode == "INTERACTION":
+                display_frame = frame.copy()
+                cv2.putText(display_frame, "INTERACTION MODE", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            else:
+                video_frame = player.update()
+                display_frame = video_frame if video_frame is not None else frame
+                if users:
+                    cv2.putText(display_frame, f"Detected: {len(users)}", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+
+            cv2.imshow(WIN_NAME, display_frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'): break
+            time.sleep(0.01)
+
+    except KeyboardInterrupt: pass
+    finally:
+        detector.stop()
+        player.stop()
+        if wake_word_service: wake_word_service.stop()
+        cv2.destroyAllWindows()
 
 if __name__ == "__main__":
-    main()
+    start_websocket_thread()
+    main_loop()
