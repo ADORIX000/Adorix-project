@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+opencv-python
+numpy
+websockets
+deepface
+tensorflow
+tf-keras
