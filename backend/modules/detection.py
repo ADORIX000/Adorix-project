@@ -4,6 +4,7 @@ import time
 import json
 import numpy as np
 from collections import Counter, deque
+from concurrent.futures import ThreadPoolExecutor
 from deepface import DeepFace
 
 from .camera import Camera
@@ -27,7 +28,7 @@ class AgeGenderDetector:
         os.makedirs(self.SHARED_DIR, exist_ok=True)
 
         # Raspberry Pi performance knobs (Adjusted for DeepFace)
-        self.SKIP_FRAMES = 15  # DeepFace is heavier, skip more frames
+        self.SKIP_FRAMES = 5   # Can be lower now that it's async
         self.DETECT_WIDTH = 320
         self.MAX_TRACKS = 2    # Reduce max tracks for performance
         self.PER_TRACK_INFER_EVERY = 2
@@ -43,9 +44,10 @@ class AgeGenderDetector:
         self.MIN_SAMPLES_FOR_STABLE = 5
 
         # UI (for debug window)
-        self.DRAW_DEBUG_WINDOW = False
-        self.LABEL_BG_COLOR = (180, 255, 180)  # soft green
-        self.LABEL_TEXT_COLOR = (0, 0, 0)
+        self.DRAW_DEBUG_WINDOW = True
+        self.LABEL_BG_COLOR = (0, 0, 0)        # Black background
+        self.LABEL_TEXT_COLOR = (255, 255, 255) # White text
+        self.RECT_COLOR = (255, 255, 0)        # Cyan box
 
         print("[INFO] Initializing DeepFace models...")
         # We don't pre-load explicitly here, DeepFace will handle it on first run
@@ -57,6 +59,10 @@ class AgeGenderDetector:
         self._fps_t = time.time()
         self._fps_count = 0
         self._fps = 0
+
+        # Background worker for AI
+        self.executor = ThreadPoolExecutor(max_workers=1)
+        self.pending_tasks = {} # tid -> future
 
         self.cam = None
 
@@ -86,6 +92,7 @@ class AgeGenderDetector:
     def stop(self):
         if self.cam:
             self.cam.stop()
+        self.executor.shutdown(wait=False)
 
     # ---------- face detection ----------
     def _detect_faces_small(self, small_bgr):
@@ -201,12 +208,19 @@ class AgeGenderDetector:
         t["age_samples"].append(age)
 
         if len(t["gender_samples"]) >= self.MIN_SAMPLES_FOR_STABLE:
-            final_gender = Counter(t["gender_samples"]).most_common(1)[0][0]
-            final_age = int(np.median(list(t["age_samples"])))
+            # Match Gender labels to screenshot (Man -> Male, Woman -> Female)
+            final_gender = "Male" if final_gender == "Man" else "Female" if final_gender == "Woman" else final_gender
             
-            # Group age into readable ranges for the dashboard if needed
-            # Or just keep it as a number
-            t["stable"] = {"id": tid, "gender": final_gender, "age": final_age}
+            # Group age into readable ranges like AD001 screenshot
+            if final_age <= 2: a_range = "0-2"
+            elif final_age <= 10: a_range = "4-10"
+            elif final_age <= 18: a_range = "11-18"
+            elif final_age <= 29: a_range = "19-29"
+            elif final_age <= 40: a_range = "30-40"
+            elif final_age <= 55: a_range = "41-55"
+            else: a_range = "56+"
+
+            t["stable"] = {"id": tid, "gender": final_gender, "age": a_range}
 
     # ---------- public output ----------
     def get_committed_people(self, now_ts):
@@ -241,7 +255,6 @@ class AgeGenderDetector:
         self.frame_count += 1
         self._update_fps()
         now_ts = time.time()
-
         run_ai = (self.frame_count % self.SKIP_FRAMES == 0)
 
         if run_ai:
@@ -261,6 +274,17 @@ class AgeGenderDetector:
                 if not t:
                     continue
 
+                # Check if this track already has a background task running
+                if tid in self.pending_tasks:
+                    future = self.pending_tasks[tid]
+                    if future.done():
+                        gender, age = future.result()
+                        self._update_track_samples(tid, gender, age)
+                        del self.pending_tasks[tid]
+                    else:
+                        # Still processing, don't start a new one
+                        continue
+
                 t["infer_counter"] += 1
                 if (t["infer_counter"] % self.PER_TRACK_INFER_EVERY) != 0:
                     continue
@@ -269,14 +293,23 @@ class AgeGenderDetector:
                 face_img = frame[
                     max(0, y1 - padding):min(y2 + padding, frame.shape[0] - 1),
                     max(0, x1 - padding):min(x2 + padding, frame.shape[1] - 1),
-                ]
+                ].copy() # Copy to avoid reference issues in thread
+                
                 if face_img.size == 0:
                     continue
 
-                gender, age_idx = self._predict_age_gender(face_img)
-                self._update_track_samples(tid, gender, age_idx)
+                # Dispatch to background thread
+                self.pending_tasks[tid] = self.executor.submit(self._predict_age_gender, face_img)
         else:
             self._cleanup_tracks(now_ts)
+            # Cleanup finished pending tasks even when not running AI
+            for tid in list(self.pending_tasks.keys()):
+                if self.pending_tasks[tid].done():
+                    future = self.pending_tasks[tid]
+                    gender, age = future.result()
+                    if tid in self.tracks:
+                        self._update_track_samples(tid, gender, age)
+                    del self.pending_tasks[tid]
 
         if self.frame_count % self.EXPORT_EVERY_FRAMES == 0:
             self.export_for_logic_engine(now_ts)
@@ -287,41 +320,38 @@ class AgeGenderDetector:
 
         return frame
 
-    def _draw_debug(self, frame, now_ts):
-        # draw tracks
-        for tid, t in self.tracks.items():
-            x1, y1, x2, y2 = t["bbox"]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
-
-            dwell = now_ts - t["first_seen"]
-            remaining = max(0.0, self.DWELL_SECONDS - dwell)
 
     def _draw_debug(self, frame, now_ts):
         # draw tracks
         for tid, t in self.tracks.items():
+            if "bbox" not in t:
+                continue
+                
             x1, y1, x2, y2 = t["bbox"]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 255), 2)
-
-            dwell = now_ts - t["first_seen"]
-            remaining = max(0.0, self.DWELL_SECONDS - dwell)
-
+            
             if t["stable"]:
                 g = t["stable"]["gender"]
                 a = t["stable"]["age"]
             else:
-                g = Counter(t["gender_samples"]).most_common(1)[0][0] if t["gender_samples"] else "..."
-                a = int(np.median(list(t["age_samples"]))) if t["age_samples"] else "..."
+                # Preview samples
+                curr_g = Counter(t["gender_samples"]).most_common(1)[0][0] if t["gender_samples"] else "?"
+                g = "Male" if curr_g == "Man" else "Female" if curr_g == "Woman" else "?"
+                a_num = int(np.median(list(t["age_samples"]))) if t["age_samples"] else "?"
+                a = str(a_num)
 
-            committed = (dwell >= self.DWELL_SECONDS and t["stable"] is not None)
-            label = f"ID:{tid} {g} {a}" if committed else f"ID:{tid} {g} {a} (wait {remaining:.1f}s)"
-
+            dwell = now_ts - t["first_seen"]
+            
+            # Match screenshot label format
+            label = f"ID:{tid}  {g}  {a}"
+            
+            cv2.rectangle(frame, (x1, y1), (x2, y2), self.RECT_COLOR, 2)
             self._draw_label(frame, x1, y1, label)
 
-        committed_people = self.get_committed_people(now_ts)
-        cv2.putText(frame, f"Tracked: {len(self.tracks)}  Committed: {len(committed_people)}  FPS:{self._fps}",
-                    (15, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 255, 0), 2)
+        # Match screenshot top text: "People detected: X" in Green
+        cv2.putText(frame, f"People detected: {len(self.tracks)}",
+                    (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 255, 0), 3)
 
-        cv2.imshow("VISION DEBUG", frame)
+        cv2.imshow("Multi-Person Age & Gender", frame)
         if cv2.waitKey(1) & 0xFF == ord("q"):
             raise SystemExit
 
