@@ -1,28 +1,34 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
-export default function useSocket(url = "ws://127.0.0.1:8000/ws") {
-  const wsRef = useRef(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState(null);
+export default function useSocket(onMessage) {
+  const ws = useRef(null);
 
   useEffect(() => {
-    const ws = new WebSocket(url);
-    wsRef.current = ws;
+    const WS_URL = "ws://localhost:8000/ws";
 
-    ws.onopen = () => setIsConnected(true);
-    ws.onclose = () => setIsConnected(false);
-    ws.onerror = () => setIsConnected(false);
+    const connect = () => {
+      ws.current = new WebSocket(WS_URL);
 
-    ws.onmessage = (event) => {
-      try {
-        setLastMessage(JSON.parse(event.data));
-      } catch {
-        setLastMessage({ raw: event.data });
-      }
+      ws.current.onopen = () =>
+        console.log("✅ Connected to Adorix Backend");
+
+      ws.current.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          onMessage(data);
+        } catch (err) {
+          console.error("WS Parse Error", err);
+        }
+      };
+
+      ws.current.onclose = () => {
+        console.log("🔌 Disconnected. Reconnecting in 3s...");
+        setTimeout(connect, 3000);
+      };
     };
 
-    return () => ws.close();
-  }, [url]);
+    connect();
 
-  return { isConnected, lastMessage, wsRef };
+    return () => ws.current?.close();
+  }, [onMessage]);
 }
