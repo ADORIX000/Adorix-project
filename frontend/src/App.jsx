@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useRef } from "react";
-import AvatarStage from "./components/avatar/AvatarStage";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 
-// ✅ Use the components you created (matches leader’s folder plan)
-import LiveStatus from "./components/LiveStatus";
-import InteractionHUD from "./components/InteractionHUD";
-import AdPlayer from "./components/AdPlayer";
+// ✅ Views (leader requirement)
+import LoopView from "./views/LoopView";
+import PersonalizedView from "./views/PersonalizedView";
+import InteractionView from "./views/InteractionView";
 
 export default function App() {
   const [systemState, setSystemState] = useState({
@@ -54,63 +53,32 @@ export default function App() {
     return () => ws.current?.close();
   }, []);
 
-  // ✅ Simple boolean for LiveStatus
-  const isConnected = !!ws.current && ws.current.readyState === 1;
+  const isConnected = useMemo(
+    () => !!ws.current && ws.current.readyState === 1,
+    [systemState.mode, systemState.avatar_state, systemState.ad]
+  );
 
-  // ✅ For AdPlayer (Personalized mode)
-  // supports "/ads/xxx.mp4" or "ads/xxx.mp4"
+  // ✅ Normalize ad path
   const adSrc =
     typeof systemState.ad === "string"
-      ? systemState.ad.startsWith("/") ? systemState.ad : `/${systemState.ad}`
+      ? systemState.ad.startsWith("/")
+        ? systemState.ad
+        : `/${systemState.ad}`
       : null;
 
-  return (
-    <div
-      className="kiosk-container"
-      style={{
-        background: "#070b12",
-        width: "100vw",
-        height: "100vh",
-        overflow: "hidden",
-        position: "relative",
-      }}
-    >
-      {/* ✅ Background video only in PERSONALIZED mode */}
-      {systemState.mode === "PERSONALIZED" && adSrc && (
-        <AdPlayer src={adSrc} show />
-      )}
-
-      {/* ✅ Live status (replaces GreenDot) */}
-      {systemState.mode !== "LOOP" && <LiveStatus isConnected={isConnected} />}
-
-      {/* ✅ Avatar Layer (Always present) */}
-      <AvatarStage
-        externalState={systemState.avatar_state}
-        externalSubtitle={systemState.subtitle}
+  // ✅ Master State Machine: route to views
+  if (systemState.mode === "PERSONALIZED") {
+    return (
+      <PersonalizedView
+        systemState={{ ...systemState, ad: adSrc }}
+        isConnected={isConnected}
       />
+    );
+  }
 
-      {/* ✅ HUD (replaces MicIcon + CallToAction)
-          - shows Listening/Speaking/Idle based on avatar_state
-          - only show HUD in interaction-related modes
-      */}
-      {systemState.mode !== "LOOP" && (
-        <InteractionHUD state={systemState.avatar_state} />
-      )}
+  if (systemState.mode === "INTERACTION") {
+    return <InteractionView systemState={systemState} isConnected={isConnected} />;
+  }
 
-      {/* Debug Info (keep for now) */}
-      <div
-        style={{
-          position: "fixed",
-          bottom: 10,
-          left: 10,
-          fontSize: 12,
-          opacity: 0.5,
-          color: "white",
-          zIndex: 999,
-        }}
-      >
-        Adorix System | Mode: {systemState.mode} | State: {systemState.avatar_state}
-      </div>
-    </div>
-  );
+  return <LoopView systemState={systemState} isConnected={isConnected} />;
 }
