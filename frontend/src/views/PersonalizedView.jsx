@@ -1,12 +1,16 @@
 import React from "react";
 import AdPlayer from "../components/AdPlayer";
+import LiveStatus from "../components/LiveStatus";
 
-export default function PersonalizedView({ adVideo }) {
+export default function PersonalizedView({ systemState, isConnected }) {
   return (
     <div style={styles.wrap}>
-      <AdPlayer src={adVideo} show />
+      {systemState.ad && <AdPlayer src={systemState.ad} show />}
+
+      <LiveStatus isConnected={isConnected} />
+
       <div style={styles.overlay}>
-        <h2>Personalized Ad</h2>
+        <h2>Personalized Experience</h2>
       </div>
     </div>
   );
@@ -18,6 +22,7 @@ const styles = {
     width: "100vw",
     height: "100vh",
     overflow: "hidden",
+    background: "#070b12",
   },
   overlay: {
     position: "absolute",
