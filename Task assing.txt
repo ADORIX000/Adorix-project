@@ -19,6 +19,7 @@ Binethma
 
 Sahan
 
+enter the code for the viwes and hooks folders form the chat (gemini chat share in the whatsapp)
 
 
 
@@ -28,7 +29,41 @@ Sahan
 
 
 Lithira
+ADORIX_FRONTEND/
+├── public/
+│   ├── ads/                   # ALL .mp4 ad videos go here
+│   └── avatar/                # Replace PNGs with: wakeup.webm, idle.webm, talking.webm
+│
+├── src/
+│   ├── assets/                # Static logos or icons (if any)
+│   │
+│   ├── components/            # Reusable UI Blocks
+│   │   ├── LiveStatus.jsx     # The top-left Green Dot & "SENSING LIVE"
+│   │   ├── InteractionHUD.jsx # The bottom mic icon and text prompts
+│   │   └── AdPlayer.jsx       # The background video player
+│   │
+│   ├── views/                 # THE 3 MAIN KIOSK STAGES
+│   │   ├── LoopView.jsx       # Stage 1
+│   │   ├── PersonalizedView.jsx # Stage 2
+│   │   └── InteractionView.jsx  # Stage 3 (Contains the AvatarOverlay)
+│   │
+│   ├── avatar/                # Avatar specific logic
+│   │   ├── AvatarOverlay.jsx  # Manages the .webm video switching
+│   │   └── avatarStates.js    # Constants: IDLE, TALKING, THINKING
+│   │
+│   ├── hooks/
+│   │   └── useSocket.js       # Listens to FastAPI backend
+│   │
+│   ├── App.jsx                # The Master State Machine
+│   ├── main.jsx
+│   └── index.css              # ONLY Tailwind directives go here
+│
+├── tailwind.config.js         # Tailwind settings
+└── package.json
 
+
+
+create this folderstructure in front end
 
 
 
@@ -48,3 +83,5 @@ Sithika
 
 
 Chanithama
+
+enter the code to the three files that in component(find it in the chat)
