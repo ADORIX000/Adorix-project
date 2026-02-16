@@ -1,38 +1,19 @@
-import React from "react";
+import React from 'react';
 
-export default function InteractionHUD({ state }) {
-  const label =
-    state === "LISTENING"
-      ? "Listening…"
-      : state === "TALKING"
-      ? "Speaking…"
-      : "Idle";
+const InteractionHUD = ({ isVisible }) => {
+  if (!isVisible) return null;
 
   return (
-    <div style={styles.wrap}>
-      <div style={styles.mic}>🎤</div>
-      <div style={styles.text}>{label}</div>
+    <div className="hud-overlay" style={{ position: 'absolute', bottom: '20px', left: '50%', transform: 'translateX(-50%)' }}>
+      <div className="avatar-circle">
+        {/* You can put an animated GIF or SVG of your avatar here */}
+        <img src="assets/avatar_idle.gif" alt="Adorix Avatar" style={{ width: '150px' }} />
+      </div>
+      <h2 style={{ color: 'white', textShadow: '2px 2px 4px black' }}>
+        "Say 'Hey Adorix' to ask a question!"
+      </h2>
     </div>
   );
-}
-
-const styles = {
-  wrap: {
-    position: "absolute",
-    bottom: 22,
-    left: "50%",
-    transform: "translateX(-50%)",
-    display: "flex",
-    alignItems: "center",
-    gap: 10,
-    padding: "10px 14px",
-    borderRadius: 16,
-    background: "rgba(0,0,0,0.35)",
-    backdropFilter: "blur(8px)",
-    color: "white",
-    fontFamily: "system-ui",
-    zIndex: 20,
-  },
-  mic: { fontSize: 18 },
-  text: { fontSize: 14, fontWeight: 600 },
 };
+
+export default InteractionHUD;
