@@ -1,0 +1,23 @@
+{
+    "product_name": "Toyota Comfort & Safety Sedan",
+    "brand": "Toyota",
+    "category": "Automotive",
+    "target_age_range": "50-59",
+    "gender_focus": "Male",
+    "price": "Price varies by model",
+    "available_colors": ["Pearl White", "Silver", "Black", "Metallic Grey", "Dark Blue"],
+    "key_features": [
+      "Safety-first design focus (varies by model)",
+      "Comfortable ride for long trips",
+      "Reliable performance and serviceability",
+      "Strong resale value reputation"
+    ],
+    "description": "A car built for peace of mind—comfort, safety, and long-term dependability for everyday and long-distance driving.",
+    "faqs": {
+      "best_for": "Family use, commuting, long-distance travel, and dependable ownership.",
+      "is_it_fuel_efficient": "Efficiency depends on the exact model and engine type.",
+      "is_it_safe_for_family_use": "Yes, safety is a major focus across most models.",
+      "is_it_easy_to_maintain": "Yes, Toyota vehicles are known for low maintenance.",
+      "does_it_have_good_resale_value": "Yes, resale value is generally strong."
+    }
+  }

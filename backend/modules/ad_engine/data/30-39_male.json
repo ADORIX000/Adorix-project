@@ -1,0 +1,23 @@
+{
+    "product_name": "iPhone 17 Series",
+    "brand": "Apple",
+    "category": "Smartphone & Tech",
+    "target_age_range": "30-39",
+    "gender_focus": "Male",
+    "price": "Rs. 389,000+",
+    "available_colors": ["Midnight Black", "Silver", "Graphite", "Deep Blue", "Titanium Grey"],
+    "key_features": [
+      "Fast performance for multitasking and work",
+      "Pro-level camera for content and family moments",
+      "Strong privacy and security focus",
+      "All-day battery optimized for busy schedules"
+    ],
+    "description": "A premium smartphone designed for high-performance productivity, smooth daily use, and powerful content creation.",
+    "faqs": {
+      "best_for": "Professionals managing work, travel, and personal life who need reliability and speed.",
+      "does_it_support_fast_charging": "Most flagship models do; confirm the exact model and charger requirements.",
+      "is_it_good_for_work_apps": "Yes, it supports productivity, business, and communication apps smoothly.",
+      "how_long_does_the_battery_last": "Designed to last a full working day with regular use.",
+      "is_it_secure": "Yes, it includes advanced security and privacy features."
+    }
+  }

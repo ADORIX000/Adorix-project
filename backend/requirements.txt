@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+websockets
+python-multipart
+python-dotenv
+pvporcupine
+pvrecorder
+pyttsx3
+SpeechRecognition
+PyAudio
+torch
+transformers
+accelerate
+numpy
+opencv-python

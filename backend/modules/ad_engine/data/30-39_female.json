@@ -1,0 +1,23 @@
+{
+    "product_name": "L’Oréal Paris Revitalift Skincare Routine Kit",
+    "brand": "L’Oréal Paris",
+    "category": "Skincare & Beauty",
+    "target_age_range": "30-39",
+    "gender_focus": "Female",
+    "price": "Rs. 9,800",
+    "available_colors": ["Red", "White", "Gold", "Rose Pink"],
+    "key_features": [
+      "Daily routine kit format (easy steps)",
+      "Hydration and firmness-focused skincare",
+      "Lightweight texture suitable under makeup",
+      "Designed for consistent everyday use"
+    ],
+    "description": "A simple skincare routine designed for busy lifestyles—helps maintain a fresh, confident look with minimal steps.",
+    "faqs": {
+      "is_it_for_sensitive_skin": "Patch-test first if you have sensitive skin.",
+      "when_to_use": "Use daily—day products in the morning, night products before bed.",
+      "how_long_until_results": "Visible improvements may appear after a few weeks of consistent use.",
+      "can_it_be_used_with_makeup": "Yes, it works well under makeup.",
+      "is_it_a_full_routine": "Yes, it is designed as a simple daily skincare routine."
+    }
+  }

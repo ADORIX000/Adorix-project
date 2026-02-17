@@ -1,0 +1,23 @@
+{
+    "product_name": "Tupperware FreshKeep Kitchen Storage Set",
+    "brand": "Tupperware",
+    "category": "Home & Kitchen",
+    "target_age_range": "60+",
+    "gender_focus": "Female",
+    "price": "Rs. 11,900",
+    "available_colors": ["Transparent", "Pastel Pink", "Light Blue", "Lavender", "Mint Green"],
+    "key_features": [
+      "Airtight sealing to keep food fresh",
+      "Easy-grip lids for simple opening and closing",
+      "Helps organize pantry and fridge neatly",
+      "Reusable containers for daily household use"
+    ],
+    "description": "A kitchen storage set made for convenience and freshness—simple to use, easy to organize, and perfect for daily cooking routines.",
+    "faqs": {
+      "is_it_microwave_safe": "Some items may be; always check the product markings before heating.",
+      "is_it_good_for_daily_use": "Yes, designed for frequent use and long-lasting storage.",
+      "are_lids_easy_to_open": "Yes, lids are designed for easy grip and opening.",
+      "does_it_keep_food_fresh_longer": "Yes, airtight sealing helps preserve freshness.",
+      "is_it_easy_to_clean": "Yes, most items are dishwasher safe."
+    }
+  }
