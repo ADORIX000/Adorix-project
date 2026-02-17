@@ -1,34 +1,16 @@
-import React from "react";
-import AdPlayer from "../components/AdPlayer";
-import LiveStatus from "../components/LiveStatus";
+import InteractionHUD from '../components/InteractionHUD';
 
-export default function PersonalizedView({ systemState, isConnected }) {
+export default function PersonalizedView({ adUrl }) {
   return (
-    <div style={styles.wrap}>
-      {systemState.ad && <AdPlayer src={systemState.ad} show />}
-
-      <LiveStatus isConnected={isConnected} />
-
-      <div style={styles.overlay}>
-        <h2>Personalized Experience</h2>
-      </div>
+    <div className="absolute inset-0 w-full h-full z-10 bg-black">
+      <video 
+        className="w-full h-full object-cover" 
+        src={`/ads/${adUrl}`} 
+        autoPlay 
+        loop 
+        muted 
+      />
+      <InteractionHUD showMic={false} />
     </div>
   );
 }
-
-const styles = {
-  wrap: {
-    position: "relative",
-    width: "100vw",
-    height: "100vh",
-    overflow: "hidden",
-    background: "#070b12",
-  },
-  overlay: {
-    position: "absolute",
-    top: 40,
-    right: 40,
-    color: "white",
-    zIndex: 10,
-  },
-};

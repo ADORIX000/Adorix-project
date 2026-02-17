@@ -1,84 +1,66 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import { useState, useEffect } from 'react';
+import { useSocket } from './hooks/useSocket';
 
-// ✅ Views (leader requirement)
-import LoopView from "./views/LoopView";
-import PersonalizedView from "./views/PersonalizedView";
-import InteractionView from "./views/InteractionView";
+import LiveStatus from './components/LiveStatus';
+import LoopView from './views/LoopView';
+import PersonalizedView from './views/PersonalizedView';
+import InteractionView from './views/InteractionView';
 
 export default function App() {
-  const [systemState, setSystemState] = useState({
-    mode: "LOOP", // LOOP, PERSONALIZED, INTERACTION
-    avatar_state: "SLEEP",
-    subtitle: "",
-    ad: null,
-  });
+  // Connect to the FastAPI WebSocket server
+  const { isConnected, lastMessage } = useSocket('ws://localhost:8000/ws');
+  
+  // State variables controlled entirely by the Python Backend
+  const [kioskMode, setKioskMode] = useState('LOOP'); // LOOP, PERSONALIZED, INTERACTION
+  const [activeAd, setActiveAd] = useState('10-15_female.mp4');
+  const [avatarState, setAvatarState] = useState('HIDDEN');
+  const [isMicActive, setIsMicActive] = useState(false);
 
-  const ws = useRef(null);
-
+  // Process incoming JSON signals from Python
   useEffect(() => {
-    const WS_URL = "ws://localhost:8000/ws";
-
-    const connectWS = () => {
-      ws.current = new WebSocket(WS_URL);
-
-      ws.current.onopen = () => console.log("✅ Adorix Backend Connected");
-
-      ws.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          if (data.action === "MODE_SWITCH") {
-            setSystemState((prev) => ({ ...prev, mode: data.mode, ad: data.ad }));
-          } else if (data.action === "AVATAR_STATUS") {
-            setSystemState((prev) => ({
-              ...prev,
-              avatar_state: data.status,
-              subtitle: data.subtitle,
-            }));
-          } else if (data.action === "PLAY_AD") {
-            setSystemState((prev) => ({ ...prev, ad: data.video }));
-          }
-        } catch (err) {
-          console.error("Failed to parse WS message", err);
-        }
-      };
-
-      ws.current.onclose = () => {
-        console.log("🔌 Disconnected. Retrying in 3s...");
-        setTimeout(connectWS, 3000);
-      };
-    };
-
-    connectWS();
-    return () => ws.current?.close();
-  }, []);
-
-  const isConnected = useMemo(
-    () => !!ws.current && ws.current.readyState === 1,
-    [systemState.mode, systemState.avatar_state, systemState.ad]
-  );
+    if (lastMessage) {
+      if (lastMessage.type === 'SET_MODE') setKioskMode(lastMessage.mode);
+      if (lastMessage.type === 'PLAY_AD') setActiveAd(lastMessage.ad_url);
+      if (lastMessage.type === 'AVATAR_SIGNAL') setAvatarState(lastMessage.state);
+      if (lastMessage.type === 'MIC_STATUS') setIsMicActive(lastMessage.active);
+    }
+  }, [lastMessage]);
 
   // ✅ Normalize ad path
-  const adSrc =
-    typeof systemState.ad === "string"
-      ? systemState.ad.startsWith("/")
-        ? systemState.ad
-        : `/${systemState.ad}`
-      : null;
+  const adUrl = typeof activeAd === "string" ? activeAd : "10-15_female.mp4";
 
   // ✅ Master State Machine: route to views
-  if (systemState.mode === "PERSONALIZED") {
+  if (kioskMode === "PERSONALIZED") {
     return (
-      <PersonalizedView
-        systemState={{ ...systemState, ad: adSrc }}
-        isConnected={isConnected}
-      />
+      <div className="relative w-full h-full flex flex-col bg-black overflow-hidden font-sans">
+        <LiveStatus isConnected={isConnected} />
+        <PersonalizedView
+          adUrl={adUrl}
+          isConnected={isConnected}
+        />
+      </div>
     );
   }
 
-  if (systemState.mode === "INTERACTION") {
-    return <InteractionView systemState={systemState} isConnected={isConnected} />;
+  if (kioskMode === "INTERACTION") {
+    return (
+      <div className="relative w-full h-full flex flex-col bg-black overflow-hidden font-sans">
+        <LiveStatus isConnected={isConnected} />
+        <InteractionView 
+          adUrl={adUrl} 
+          avatarState={avatarState} 
+          isMicActive={isMicActive}
+          isConnected={isConnected} 
+        />
+      </div>
+    );
   }
 
-  return <LoopView systemState={systemState} isConnected={isConnected} />;
+  // Default to LoopView
+  return (
+    <div className="relative w-full h-full flex flex-col bg-black overflow-hidden font-sans">
+      <LiveStatus isConnected={isConnected} />
+      <LoopView />
+    </div>
+  );
 }

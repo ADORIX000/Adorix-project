@@ -1,29 +1,22 @@
-import React from "react";
-import AvatarOverlay from "../avatar/AvatarOverlay";
-import InteractionHUD from "../components/InteractionHUD";
-import LiveStatus from "../components/LiveStatus";
+import AvatarOverlay from '../avatar/AvatarOverlay';
+import InteractionHUD from '../components/InteractionHUD';
 
-export default function InteractionView({ systemState, isConnected }) {
+export default function InteractionView({ adUrl, avatarState, isMicActive }) {
   return (
-    <div style={styles.wrap}>
-      <AvatarOverlay state={systemState.avatar_state} />
-
-      <LiveStatus isConnected={isConnected} />
-
-      <InteractionHUD
-        state={systemState.avatar_state}
-        subtitle={systemState.subtitle}
+    <div className="absolute inset-0 w-full h-full z-20 bg-black">
+      {/* Dim the background ad so the Avatar pops out more */}
+      <video 
+        className="w-full h-full object-cover brightness-40 transition-all duration-500" 
+        src={`/ads/${adUrl}`} 
+        autoPlay 
+        loop 
+        muted 
       />
+      
+      <AvatarOverlay state={avatarState} />
+      
+      {/* Show the mic HUD only if the system is actively recording user audio */}
+      {isMicActive && <InteractionHUD showMic={true} />}
     </div>
   );
 }
-
-const styles = {
-  wrap: {
-    position: "relative",
-    width: "100vw",
-    height: "100vh",
-    background: "#070b12",
-    overflow: "hidden",
-  },
-};
