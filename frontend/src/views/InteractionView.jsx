@@ -1,53 +1,54 @@
-import { useState } from 'react';
+import React from 'react';
 import AvatarOverlay from '../avatar/AvatarOverlay';
-import InteractionHUD from '../components/InteractionHUD';
+import { Mic } from 'lucide-react';
+import { AVATAR_STATES } from '../avatar/avatarStates';
 
-export default function InteractionView({ adUrl, avatarState: initialAvatarState, isMicActive }) {
-  // Local override for testing
-  const [testState, setTestState] = useState(null);
-  
-  const currentState = testState || initialAvatarState;
+export default function InteractionView({ adUrl, avatarState }) {
+  // Determine if the AI is actively listening to the user
+  // (If she is IDLE, it means she is waiting for the user to speak)
+  const isListening = avatarState === AVATAR_STATES.IDLE;
 
   return (
-    <div className="absolute inset-0 w-full h-full z-20 bg-black overflow-hidden">
-      {/* Dim the background ad so the Avatar pops out more */}
+    <div className="absolute inset-0 w-full h-full z-30 bg-black flex flex-col justify-end">
+      
+      {/* ========================================== */}
+      {/* 1. THE CINEMATIC BACKGROUND (Dimmed Ad) */}
+      {/* ========================================== */}
       <video 
-        className="w-full h-full object-cover brightness-40 transition-all duration-500" 
+        // We continue playing the targeted ad, but we blur and dim it 
+        // so the user's focus shifts entirely to the Avatar.
+        className="absolute inset-0 w-full h-full object-cover opacity-30 blur-sm transition-all duration-1000 ease-in-out" 
         src={`/ads/${adUrl}`} 
         autoPlay 
         loop 
         muted 
+        playsInline
       />
-      
-      <AvatarOverlay state={currentState} />
-      
-      {/* Show the mic HUD only if the system is actively recording user audio */}
-      {isMicActive && <InteractionHUD showMic={true} />}
 
-      {/* --- DEBUG/TESTING PANEL --- */}
-      <div className="absolute top-20 right-5 z-50 bg-black/80 p-4 rounded-lg border border-white/20 text-white font-mono text-xs flex flex-col gap-2">
-        <div className="font-bold border-b border-white/20 pb-2 mb-1">Avatar Test Panel</div>
-        <div className="flex flex-wrap gap-1 max-w-[200px]">
-          {['WAKEUP', 'IDLE', 'TALKING', 'THINKING', 'SLEEP'].map(s => (
-            <button 
-              key={s}
-              onClick={() => setTestState(s)}
-              className={`px-2 py-1 rounded ${currentState === s ? 'bg-green-600' : 'bg-white/10 hover:bg-white/20'}`}
-            >
-              {s}
-            </button>
-          ))}
-          <button 
-            onClick={() => setTestState(null)}
-            className="px-2 py-1 rounded bg-red-600/50 hover:bg-red-600 w-full mt-1"
-          >
-            Reset to Backend
-          </button>
+      {/* A dark gradient from the bottom to make the Avatar pop out clearly */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-0 pointer-events-none"></div>
+
+      {/* ========================================== */}
+      {/* 2. THE DYNAMIC MICROPHONE HUD */}
+      {/* ========================================== */}
+      {/* We only show the pulsing microphone when the AI is waiting for user input */}
+      <div className={`absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-40 transition-opacity duration-500 ${isListening ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="w-20 h-20 bg-adorix-blue/20 rounded-full flex items-center justify-center animate-pulse shadow-[0_0_50px_rgba(0,184,255,0.4)] border border-adorix-blue/50">
+           <Mic className="text-adorix-blue" size={36} />
         </div>
-        <div className="mt-2 opacity-50 text-[10px]">
-          Current: {currentState}
-        </div>
+        <p className="text-adorix-blue font-bold mt-6 tracking-[0.3em] text-sm uppercase animate-pulse">
+           Listening...
+        </p>
       </div>
+
+      {/* ========================================== */}
+      {/* 3. THE 2D AVATAR OVERLAY */}
+      {/* ========================================== */}
+      {/* We pass the avatarState down so the Avatar overlay knows which preloaded video to play */}
+      <div className="relative z-50 w-full flex justify-center pb-0">
+        <AvatarOverlay backendSignal={avatarState} />
+      </div>
+
     </div>
   );
 }
