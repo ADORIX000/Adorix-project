@@ -1,101 +1,83 @@
-import React, { useEffect, useState, useRef } from "react";
-import AvatarStage from "./components/avatar/AvatarStage";
+import React, { useEffect, useState, useRef, useMemo } from "react";
+import LoopView from "./views/LoopView";
+import PersonalizedView from "./views/PersonalizedView";
+import InteractionView from "./views/InteractionView";
 
 export default function App() {
+  // 1. Define your playlist based on your folder filenames
+  const playlist = [
+    "ads/10-15_female.mp4",
+    "ads/10-15_male.mp4",
+    "ads/16-29_female.mp4",
+    "ads/16-29_male.mp4",
+    "ads/30-39_female.mp4",
+    "ads/30-39_male.mp4",
+    "ads/40-49_female.mp4",
+    "ads/40-49_male.mp4",
+    "ads/50-59_female.mp4",
+    "ads/50-59_male.mp4",
+    "ads/above-60_female.mp4",
+    "ads/above-60_male.mp4"
+  ];
+
+  const [adIndex, setAdIndex] = useState(0);
   const [systemState, setSystemState] = useState({
-    mode: "LOOP", // LOOP, PERSONALIZED, INTERACTION
+    mode: "PERSONALIZED",
     avatar_state: "SLEEP",
     subtitle: "",
-    ad: null
+    ad: playlist[0], // Start with the first ad
   });
-  
+
   const ws = useRef(null);
+
+  // 2. Function to switch to the next ad
+  const playNextAd = () => {
+    setAdIndex((prevIndex) => {
+      const nextIndex = (prevIndex + 1) % playlist.length;
+      setSystemState((prev) => ({ ...prev, ad: playlist[nextIndex] }));
+      return nextIndex;
+    });
+  };
 
   useEffect(() => {
     const WS_URL = "ws://localhost:8000/ws";
-
     const connectWS = () => {
       ws.current = new WebSocket(WS_URL);
-
-      ws.current.onopen = () => console.log("✅ Adorix Backend Connected");
-      
       ws.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           if (data.action === "MODE_SWITCH") {
-             setSystemState(prev => ({ ...prev, mode: data.mode, ad: data.ad }));
-          } else if (data.action === "AVATAR_STATUS") {
-             setSystemState(prev => ({ 
-                 ...prev, 
-                 avatar_state: data.status, 
-                 subtitle: data.subtitle 
-             }));
-          } else if (data.action === "PLAY_AD") {
-              setSystemState(prev => ({ ...prev, ad: data.video }));
+            setSystemState((prev) => ({ ...prev, mode: data.mode, ad: data.ad }));
           }
+          // ... rest of your WS logic
         } catch (err) {
           console.error("Failed to parse WS message", err);
         }
       };
-
-      ws.current.onclose = () => {
-        console.log("🔌 Disconnected. Retrying in 3s...");
-        setTimeout(connectWS, 3000);
-      };
     };
-
     connectWS();
     return () => ws.current?.close();
   }, []);
 
-  // UI Components
-  const GreenDot = () => (
-    <div style={{
-      position: "fixed", top: 20, right: 20, width: 15, height: 15,
-      background: "#00ff00", borderRadius: "50%",
-      boxShadow: "0 0 10px #00ff00", zIndex: 999
-    }} />
+  const isConnected = useMemo(
+    () => !!ws.current && ws.current.readyState === 1,
+    [systemState.mode, systemState.ad]
   );
 
-  const MicIcon = () => (
-    <div style={{
-      position: "fixed", bottom: 80, left: "50%", transform: "translateX(-50%)",
-      fontSize: 40, color: "white", zIndex: 999
-    }}>
-      🎙️
-    </div>
-  );
+  const adSrc = typeof systemState.ad === "string"
+    ? systemState.ad.startsWith("/") ? systemState.ad : `/${systemState.ad}`
+    : null;
 
-  const CallToAction = () => (
-    <div style={{
-      position: "fixed", bottom: 40, left: "50%", transform: "translateX(-50%)",
-      color: "white", fontSize: 24, textShadow: "0 2px 4px rgba(0,0,0,0.8)",
-      fontFamily: "Arial, sans-serif", zIndex: 999
-    }}>
-      To interact with Adorix, say <b>"Hey Adorix"</b>
-    </div>
-  );
-
-  return (
-    <div className="kiosk-container" style={{ background: "#070b12", width: "100vw", height: "100vh", overflow: "hidden" }}>
-      
-      {/* 1. Avatar Layer (Always present but state changes) */}
-      <AvatarStage 
-        externalState={systemState.avatar_state} 
-        externalSubtitle={systemState.subtitle}
+  if (systemState.mode === "PERSONALIZED") {
+    return (
+      <PersonalizedView
+        systemState={{ ...systemState, ad: adSrc }}
+        isConnected={isConnected}
+        onAdEnd={playNextAd} // 3. Pass the callback function
       />
+    );
+  }
 
-      {/* 2. Overlays based on Mode */}
-      {systemState.mode !== "LOOP" && <GreenDot />}
-      
-      {systemState.mode === "PERSONALIZED" && <CallToAction />}
-      
-      {systemState.avatar_state === "LISTENING" && <MicIcon />}
-
-      {/* 3. Debug Info */}
-      <div style={{ position: "fixed", bottom: 10, left: 10, fontSize: 12, opacity: 0.5, color: "white" }}>
-        Adorix System | Mode: {systemState.mode} | State: {systemState.avatar_state}
-      </div>
-    </div>
-  );
+  // ... rest of your route logic
+  return <LoopView systemState={systemState} isConnected={isConnected} />;
 }
