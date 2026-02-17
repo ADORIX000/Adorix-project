@@ -1,0 +1,23 @@
+{
+    "product_name": "Samsung Galaxy S Series (Productivity Edition)",
+    "brand": "Samsung",
+    "category": "Smartphone & Tech",
+    "target_age_range": "40-49",
+    "gender_focus": "Male",
+    "price": "Rs. 315,000",
+    "available_colors": ["Phantom Black", "Silver", "Navy", "Forest Green"],
+    "key_features": [
+      "Large high-resolution display for work and entertainment",
+      "Smooth multitasking performance",
+      "Security features designed for modern users",
+      "High-quality camera for travel and family"
+    ],
+    "description": "A flagship smartphone positioned for productivity, reliability, and powerful everyday performance.",
+    "faqs": {
+      "best_for": "Professionals and parents who need a fast, dependable phone for daily tasks.",
+      "is_storage_expandable": "Depends on the exact model—some support it, some do not.",
+      "is_it_good_for_multitasking": "Yes, it handles multiple apps smoothly.",
+      "does_it_support_business_use": "Yes, it is suitable for emails, meetings, and productivity tools.",
+      "is_it_user_friendly": "Yes, the interface is designed for ease of use."
+    }
+  }

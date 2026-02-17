@@ -1,0 +1,23 @@
+{
+    "product_name": "Dove Deep Moisture Body Care Bundle",
+    "brand": "Dove",
+    "category": "Personal Care",
+    "target_age_range": "40-49",
+    "gender_focus": "Female",
+    "price": "Rs. 3,950",
+    "available_colors": ["White", "Light Blue", "Navy Blue"],
+    "key_features": [
+      "Moisture-focused daily care",
+      "Gentle formula designed for everyday use",
+      "Comfort-first skin feel",
+      "Easy routine with body wash + lotion"
+    ],
+    "description": "A daily body care bundle designed to keep skin feeling soft, comfortable, and cared for every day.",
+    "faqs": {
+      "is_it_for_dry_skin": "Yes, it is commonly chosen for moisture support.",
+      "can_i_use_daily": "Yes, it is designed for daily use.",
+      "is_it_gentle_on_skin": "Yes, it uses mild cleansing ingredients.",
+      "does_it_have_a_strong_fragrance": "No, the fragrance is light and subtle.",
+      "can_it_be_used_by_all_skin_types": "Yes, it suits most skin types."
+    }
+  }

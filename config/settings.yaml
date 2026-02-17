@@ -1,0 +1,24 @@
+vision:
+  camera_index: 0
+  width: 640
+  height: 480
+
+  skip_frames: 10
+  detect_width: 320
+  max_tracks: 4
+  per_track_infer_every: 3
+
+  dwell_seconds: 3.0
+  track_timeout: 2.0
+  match_distance: 90
+
+  samples_window: 20
+  min_samples_for_stable: 8
+
+ad_engine:
+  rules_path: "services/ad_engine/rules.json"
+  ads_dir: "services/ad_engine/ads"
+
+player:
+  window_name: "ADORIX AD PLAYER"
+  poll_seconds: 0.2
