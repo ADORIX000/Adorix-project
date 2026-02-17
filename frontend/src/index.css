@@ -7,6 +7,10 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
   
+  #root {
+    @apply w-full h-full;
+  }
+  
   /* Hide scrollbar for Kiosk */
   ::-webkit-scrollbar {
     display: none;

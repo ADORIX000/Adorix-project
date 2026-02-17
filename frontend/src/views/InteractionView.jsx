@@ -3,7 +3,7 @@ import AvatarOverlay from '../avatar/AvatarOverlay';
 import { Mic } from 'lucide-react';
 import { AVATAR_STATES } from '../avatar/avatarStates';
 
-export default function InteractionView({ adUrl, avatarState }) {
+export default function InteractionView({ adUrl, avatarState, setAvatarState }) {
   // Determine if the AI is actively listening to the user
   // (If she is IDLE, it means she is waiting for the user to speak)
   const isListening = avatarState === AVATAR_STATES.IDLE;
@@ -46,7 +46,7 @@ export default function InteractionView({ adUrl, avatarState }) {
       {/* ========================================== */}
       {/* We pass the avatarState down so the Avatar overlay knows which preloaded video to play */}
       <div className="relative z-50 w-full flex justify-center pb-0">
-        <AvatarOverlay backendSignal={avatarState} />
+        <AvatarOverlay avatarState={avatarState} setAvatarState={setAvatarState} />
       </div>
 
     </div>

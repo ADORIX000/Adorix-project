@@ -16,7 +16,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
     }
   };
 
-  if (avatarState === AVATAR_STATES.HIDDEN) return null;
+  if (avatarState === AVATAR_STATES.HIDDEN || avatarState === 'HIDDEN') return null;
 
   return (
     <div className="absolute bottom-0 w-full flex justify-center z-50 pointer-events-none">
@@ -25,7 +25,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
         {/* NON-LOOPING VIDEOS (Trigger handleVideoEnd) */}
         {avatarState === AVATAR_STATES.WAKEUP && (
           <video 
-            src="/avatar/wakeup.webm" 
+            src="/avatar-videos/wakeup.webm" 
             autoPlay muted playsInline 
             onEnded={handleVideoEnd} 
             className="w-full h-auto drop-shadow-2xl"
@@ -34,7 +34,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
 
         {avatarState === AVATAR_STATES.SLEEP && (
           <video 
-            src="/avatar/sleep.webm" 
+            src="/avatar-videos/sleep.webm" 
             autoPlay muted playsInline 
             onEnded={handleVideoEnd} 
             className="w-full h-auto drop-shadow-2xl"
@@ -44,7 +44,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
         {/* LOOPING VIDEOS (Run infinitely) */}
         {avatarState === AVATAR_STATES.IDLE && (
           <video 
-            src="/avatar/idle.webm" 
+            src="/avatar-videos/listening.webm" 
             autoPlay loop muted playsInline 
             className="w-full h-auto drop-shadow-2xl"
           />
@@ -52,7 +52,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
 
         {avatarState === AVATAR_STATES.THINKING && (
           <video 
-            src="/avatar/thinking.webm" 
+            src="/avatar-videos/thinking.webm" 
             autoPlay loop muted playsInline 
             className="w-full h-auto drop-shadow-2xl"
           />
@@ -60,7 +60,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
 
         {avatarState === AVATAR_STATES.TALKING && (
           <video 
-            src="/avatar/talking.webm" 
+            src="/avatar-videos/talking.webm" 
             autoPlay loop muted playsInline 
             className="w-full h-auto drop-shadow-2xl"
           />
