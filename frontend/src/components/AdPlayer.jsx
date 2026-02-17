@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function AdPlayer({ src, show = true }) {
+export default function AdPlayer({ src, show = true, onEnded }) {
   if (!show || !src) return null;
 
   return (
@@ -9,8 +9,9 @@ export default function AdPlayer({ src, show = true }) {
       src={src}
       autoPlay
       muted
-      loop
+      // Removed 'loop' so it can actually finish and trigger the next ad
       playsInline
+      onEnded={onEnded}
       style={styles.video}
     />
   );
