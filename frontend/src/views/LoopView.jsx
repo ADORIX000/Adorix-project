@@ -1,32 +1,13 @@
-import React from "react";
-import AdPlayer from "../components/AdPlayer";
-
-export default function LoopView({ systemState }) {
+export default function LoopView() {
   return (
-    <div style={styles.wrap}>
-      <AdPlayer src="/ads/default.mp4" show />
-
-      <div style={styles.overlay}>
-        <h1>ADORIX</h1>
-        <p>Smart AI Advertising Experience</p>
-      </div>
+    <div className="absolute inset-0 w-full h-full z-0">
+      <video 
+        className="w-full h-full object-cover opacity-80" 
+        src="/ads/generic_loop.mp4" 
+        autoPlay 
+        loop 
+        muted 
+      />
     </div>
   );
 }
-
-const styles = {
-  wrap: {
-    position: "relative",
-    width: "100vw",
-    height: "100vh",
-    overflow: "hidden",
-    background: "#070b12",
-  },
-  overlay: {
-    position: "absolute",
-    bottom: 40,
-    left: 40,
-    color: "white",
-    zIndex: 10,
-  },
-};
