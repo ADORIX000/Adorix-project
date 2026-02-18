@@ -8,6 +8,8 @@ import threading
 import time
 import os
 import sys
+import hashlib
+from gtts import gTTS # Ensure you run: pip install gTTS
 
 # Add the backend and modules directories to the path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,45 +22,69 @@ if modules_dir not in sys.path:
 # Local modules
 from wake_word import WakeWordService
 from interaction.interaction_manager import start_interaction_loop
-from interaction.tts_engine import speak
+# Note: get_tts_file now replaces or supplements your local tts_engine.speak
+
+# --- TTS Cache Configuration (Task #25) ---
+TTS_CACHE_DIR = os.path.join(current_dir, "static/tts_cache")
+os.makedirs(TTS_CACHE_DIR, exist_ok=True)
+
+def get_tts_file(text: str, lang: str = 'en') -> str:
+    """
+    Requirement #25: Checks if a TTS file exists via hash. 
+    If not, creates it and returns the path.
+    """
+    # Create a unique filename based on the text hash (Check requirement)
+    text_hash = hashlib.md5(text.encode()).hexdigest()
+    file_name = f"{text_hash}.mp3"
+    file_path = os.path.join(TTS_CACHE_DIR, file_name)
+
+    # Check if file already exists
+    if os.path.exists(file_path):
+        print(f"✅ [TTS] Cache Hit: {file_name}")
+        return f"static/tts_cache/{file_name}"
+
+    # If not, create it (Create requirement)
+    try:
+        print(f"🎙️ [TTS] Generating new file for: '{text[:20]}...'")
+        tts = gTTS(text=text, lang=lang)
+        tts.save(file_path)
+        return f"static/tts_cache/{file_name}"
+    except Exception as e:
+        print(f"❌ [TTS] Error: {e}")
+        return ""
 
 # --- Global System State ---
 system_state = {
-    "mode": "IDLE",  # IDLE, INTERACTION
+    "mode": "IDLE", 
     "avatar_state": "SLEEP",
     "subtitle": "",
-    "current_ad_json": "gaming_ad.json", # Default JSON to load for RAG
+    "audio_url": "", # New field for TTS audio delivery
+    "current_ad_json": "gaming_ad.json",
     "product_data": {
         "product": "Adorix Assistant",
-        "context": "I am Adorix, your intelligent AI assistant. I can answer questions about our services and help you navigate the system."
+        "context": "I am Adorix, your intelligent AI assistant."
     }
 }
 
 connected_clients = []
 wake_word_service = None
-main_loop = None # Added to capture the event loop from the main thread
+main_loop = None 
 
 async def broadcast_state():
     state_payload = json.dumps(system_state)
     if not connected_clients:
         return
-    
-    # Create a list of tasks for broadcasting
     tasks = [client.send_text(state_payload) for client in connected_clients]
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
 
 def sync_broadcast():
-    """Helper to broadcast state from synchronous code/threads"""
     global main_loop
     if main_loop:
         try:
-            # Safely schedule the coroutine in the main loop
             asyncio.run_coroutine_threadsafe(broadcast_state(), main_loop)
         except Exception as e:
             print(f"!!! [Broadcast] Error: {e}")
-    else:
-        print("!!! [Broadcast] Main event loop not captured yet.")
 
 def interaction_state_callback(avatar_state=None, subtitle=None):
     global system_state
@@ -66,8 +92,12 @@ def interaction_state_callback(avatar_state=None, subtitle=None):
         system_state["avatar_state"] = avatar_state
     if subtitle is not None:
         system_state["subtitle"] = subtitle
+        # When a subtitle is generated, check/create the TTS file
+        if avatar_state == "SPEAKING" or subtitle != "":
+            audio_path = get_tts_file(subtitle)
+            # Prepend host info for frontend
+            system_state["audio_url"] = f"http://localhost:8001/{audio_path}"
     
-    print(f">>> [System] State Update: {avatar_state} | {subtitle}")
     sync_broadcast()
 
 def on_wake_word():
@@ -77,41 +107,32 @@ def on_wake_word():
         system_state["mode"] = "INTERACTION"
         system_state["avatar_state"] = "WAKE"
         system_state["subtitle"] = "Yes? I'm listening..."
-        
         sync_broadcast()
-        
-        # Start the interaction loop in a SEPARATE thread to not block the wake word service
         threading.Thread(target=handle_interaction, daemon=True).start()
 
 def handle_interaction():
     global system_state
     try:
-        # This runs the interaction loop (STT -> LLM -> TTS)
         result = start_interaction_loop(
             system_state["current_ad_json"], 
             state_callback=interaction_state_callback
         )
-        print(f">>> [Interaction] Loop ended with: {result}")
     except Exception as e:
-        print(f"!!! [Interaction] Critical error in loop: {e}")
+        print(f"!!! [Interaction] Critical error: {e}")
     finally:
         system_state["mode"] = "IDLE"
         system_state["avatar_state"] = "SLEEP"
         system_state["subtitle"] = ""
+        system_state["audio_url"] = ""
         sync_broadcast()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global wake_word_service, main_loop
-    # Capture the main event loop
     main_loop = asyncio.get_running_loop()
-    
-    # Initialize wake word
     wake_word_service = WakeWordService(callback_function=on_wake_word)
     threading.Thread(target=wake_word_service.start, daemon=True).start()
-    print(">>> [System] Adorix Assistant Ready (Wake Word Active)")
     yield
-    # Cleanup
     if wake_word_service:
         wake_word_service.stop()
 
@@ -125,8 +146,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- Serving Static Files (Ads and TTS Cache) ---
 if os.path.exists("backend/ads"):
     app.mount("/ads", StaticFiles(directory="backend/ads"), name="ads")
+
+# Serves the TTS cache folder so the frontend can play the .mp3 files
+if not os.path.exists("static"):
+    os.makedirs("static")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -142,4 +169,3 @@ async def websocket_endpoint(websocket: WebSocket):
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8001)
-    
