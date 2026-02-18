@@ -1,12 +1,9 @@
 {
   "IDLE": "puppy_ad.mp4",
   "DEFAULT": "furniture_ad.mp4",
-
   "SHUFFLE_IDLE": true,
-
-  "Female_19-29": "makeup_ad.mp4",
-  "Male_19-29": "gaming_ad.mp4",
-
-  "Female_29-39": "phone_ad.mp4",
-  "Male_29-39": "furniture_ad.mp4"
+  "Female_16-29": "makeup_ad.mp4",
+  "Male_16-29": "gaming_ad.mp4",
+  "Female_30-39": "phone_ad.mp4",
+  "Male_30-39": "furniture_ad.mp4"
 }
