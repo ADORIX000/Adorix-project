@@ -3,6 +3,7 @@ import threading
 import time
 import os
 import numpy as np
+from collections import Counter # <-- NEW: For calculating the majority vote
 
 class AdorixVision:
     def __init__(self, broadcast_callback):
@@ -10,7 +11,11 @@ class AdorixVision:
         self.last_analysis = 0
         self.is_analyzing = False
         
-        # Load Models (No TensorFlow or MediaPipe needed!)
+        # --- NEW: BUFFER STATE VARIABLES ---
+        self.detection_buffer = []      # Holds all predictions made in the 2-second window
+        self.buffer_start_time = None   # Tracks when the timer started
+        
+        # Load Models
         current_dir = os.path.dirname(os.path.abspath(__file__))
         model_dir = os.path.join(current_dir, "modules", "vision", "models")
         
@@ -40,46 +45,29 @@ class AdorixVision:
             self.gender_net = None
 
         self.MODEL_MEAN_VALUES = (78.4263377603, 87.7689143744, 114.895847746)
-        self.AGE_LIST = ['(0-2)', '(4-6)', '(8-12)', '(15-20)', '(25-32)', '(38-43)', '(48-53)', '(60-100)']
+        self.AGE_LIST = ['(10-15)', '(16-29)', '(30-39)', '(40-49)', '(50-59)', '(60-100)']
         self.GENDER_LIST = ['Male', 'Female']
 
     def map_to_group(self, age_idx, gender_pred):
-        """
-        Translates raw AI data into Adorix predefined format.
-        """
-        # 1. Gender
+        """Translates raw AI data into Adorix predefined format."""
         gender = self.GENDER_LIST[gender_pred[0].argmax()].lower()
         
-        # 2. Age Mapping
-        # AGE_LIST = ['(0-2)', '(4-6)', '(8-12)', '(15-20)', '(25-32)', '(38-43)', '(48-53)', '(60-100)']
-        # Index:       0        1        2         3          4          5          6          7
-        
-        # Simplified mapping logic for Adorix standard groups
-        if age_idx <= 2: # 0-12
-            age_group = "10-15"
-        elif age_idx == 3: # 15-20
-            age_group = "16-29"
-        elif age_idx == 4: # 25-32
-            age_group = "16-29"
-        elif age_idx == 5: # 38-43
-            age_group = "30-39"
-        elif age_idx == 6: # 48-53
-            age_group = "50-59"
-        else: # 60+
-            age_group = "above-60"
+        if age_idx <= 2: age_group = "10-15"
+        elif age_idx == 3: age_group = "16-29"
+        elif age_idx == 4: age_group = "16-29"
+        elif age_idx == 5: age_group = "30-39"
+        elif age_idx == 6: age_group = "50-59"
+        else: age_group = "above-60"
             
         return f"{age_group}_{gender}"
 
     def predict_age_gender(self, face_img):
         blob = cv2.dnn.blobFromImage(face_img, 1.0, (227, 227), self.MODEL_MEAN_VALUES, swapRB=False)
-        
         self.gender_net.setInput(blob)
         gender_preds = self.gender_net.forward()
-        
         self.age_net.setInput(blob)
         age_preds = self.age_net.forward()
         age_idx = age_preds[0].argmax()
-        
         return age_idx, gender_preds
 
     def detect_faces(self, frame):
@@ -100,20 +88,15 @@ class AdorixVision:
         return bboxes
 
     def analyze(self, frame):
+        """Background worker: Now it only adds to the buffer, it doesn't broadcast."""
         try:
             self.is_analyzing = True
-            
-            # Since we pass in a fresh frame copy, we re-detect faces here
-            # Or pass the bbox. Let's re-detect for clean thread logic.
             bboxes = self.detect_faces(frame)
-            
             demographics_list = []
             
             if bboxes:
                 for (x1, y1, x2, y2) in bboxes:
                     h, w = frame.shape[:2]
-                    
-                    # Padding
                     padding = 20
                     py1 = max(0, y1 - padding)
                     py2 = min(h, y2 + padding)
@@ -129,13 +112,10 @@ class AdorixVision:
                         demographics_list.append(mapped)
                 
                 if demographics_list:
-                    unique = list(set(demographics_list))
-                    data = {
-                        "system_id": 2, 
-                        "demographics": unique
-                    }
-                    self.broadcast(data)
-                
+                    # Strip duplicates from THIS specific frame and add to the global list
+                    unique_in_frame = list(set(demographics_list))
+                    self.detection_buffer.extend(unique_in_frame)
+                    
         except Exception as e:
             print(f"[ERROR] Analysis error: {e}")
         finally: 
@@ -152,28 +132,50 @@ class AdorixVision:
         try:
             while cap.isOpened():
                 ret, frame = cap.read()
-                if not ret:
-                    print("[WARNING] Frame read failed. Exiting...")
-                    break
+                if not ret: break
                 
-                # Fast trigger: Is anyone there?
                 if self.face_net:
                     bboxes = self.detect_faces(frame)
                     
                     if bboxes:
-                        # If people are detected, analyze them every 2 seconds
-                        if time.time() - self.last_analysis > 2.0 and not self.is_analyzing:
-                            self.last_analysis = time.time()
-                            # Use a copy of the frame for thread safety
+                        # 1. START THE CLOCK
+                        if self.buffer_start_time is None:
+                            self.buffer_start_time = time.time()
+                            self.detection_buffer = [] # Start fresh
+                            
+                        # 2. COLLECT DATA (Fire thread continuously without blocking)
+                        if not self.is_analyzing:
                             threading.Thread(target=self.analyze, args=(frame.copy(),), daemon=True).start()
+                            
+                        # 3. THE 2-SECOND EVALUATION
+                        if time.time() - self.buffer_start_time >= 2.0:
+                            if self.detection_buffer:
+                                # Count the list and get the #1 most frequent value
+                                most_common_tuple = Counter(self.detection_buffer).most_common(1)
+                                winning_demographic = most_common_tuple[0][0]
+                                
+                                print(f"\n[WINNER] 2-Sec Analysis complete: {winning_demographic}")
+                                
+                                # Broadcast the winner to React
+                                self.broadcast({
+                                    "system_id": 2, 
+                                    "demographics": [winning_demographic]
+                                })
+                            
+                            # Reset the clock so it continues to evaluate every 2 seconds
+                            # while they stand in front of the kiosk.
+                            self.buffer_start_time = time.time()
+                            self.detection_buffer = []
                     else:
-                        # No one is in the frame -> Revert to generic Loop Mode
-                        # Rate limit this to avoid spamming the socket every 30ms
+                        # No one is in the frame -> Wipe the buffer
+                        self.buffer_start_time = None
+                        self.detection_buffer = []
+                        
+                        # Revert to generic Loop Mode (Rate limited)
                         if time.time() - self.last_analysis > 1.0:
                             self.broadcast({"system_id": 1})
-                            self.last_analysis = time.time() # Reset timer to avoid spam
+                            self.last_analysis = time.time() 
                 
-                # Optional: Sleep slightly to reduce CPU usage if needed
                 time.sleep(0.01)
 
         except KeyboardInterrupt:
