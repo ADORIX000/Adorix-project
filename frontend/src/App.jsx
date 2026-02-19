@@ -1,92 +1,37 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSocket } from './hooks/useSocket';
-
-import LiveStatus from './components/LiveStatus';
+import { AVATAR_STATES } from './avatar/avatarStates';
 import LoopView from './views/LoopView';
-import PersonalizedView from './views/PersonalizedView';
 import InteractionView from './views/InteractionView';
-import BackendSimulator from './testing/BackendSimulator';
 
 export default function App() {
-  // Connect to the FastAPI WebSocket server
-  const { isConnected, lastMessage } = useSocket('ws://localhost:8000/ws');
-  
-  // State variables controlled by the Python Backend OR the BackendSimulator
-  const [kioskMode, setKioskMode] = useState('INTERACTION'); // Defaulting to INTERACTION for testing
+  const [systemId, setSystemId] = useState(1);
   const [activeAd, setActiveAd] = useState('10-15_female.mp4');
-  const [avatarState, setAvatarState] = useState('WAKEUP');
-  const [isMicActive, setIsMicActive] = useState(false);
+  const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
+  const { lastMessage } = useSocket('ws://localhost:8000/ws');
 
-  // Process incoming JSON signals from Python
   useEffect(() => {
     if (lastMessage) {
-      if (lastMessage.type === 'SET_MODE') setKioskMode(lastMessage.mode);
-      if (lastMessage.type === 'PLAY_AD') setActiveAd(lastMessage.ad_url);
-      if (lastMessage.type === 'AVATAR_SIGNAL') setAvatarState(lastMessage.state);
-      if (lastMessage.type === 'MIC_STATUS') setIsMicActive(lastMessage.active);
+      if (lastMessage.system_id) setSystemId(lastMessage.system_id);
+      if (lastMessage.ad_url) setActiveAd(lastMessage.ad_url);
+      if (lastMessage.avatar_state) setAvatarState(lastMessage.avatar_state);
     }
   }, [lastMessage]);
 
-  // ✅ Normalize ad path
-  const adUrl = typeof activeAd === "string" ? activeAd : "10-15_female.mp4";
-
-  // ✅ Master State Machine: route to views
-  if (kioskMode === "PERSONALIZED") {
-    return (
-      <div className="relative w-full h-full flex flex-col bg-black overflow-hidden font-sans">
-        <LiveStatus isConnected={isConnected} />
-        <PersonalizedView
-          adUrl={adUrl}
-          isConnected={isConnected}
-        />
-        <BackendSimulator 
-          currentMode={kioskMode}
-          setKioskMode={setKioskMode}
-          avatarState={avatarState}
-          setAvatarState={setAvatarState}
-          isMicActive={isMicActive}
-          setIsMicActive={setIsMicActive}
-        />
-      </div>
-    );
-  }
-
-  if (kioskMode === "INTERACTION") {
-    return (
-      <div className="relative w-full h-full flex flex-col bg-black overflow-hidden font-sans">
-        <LiveStatus isConnected={isConnected} />
-        <InteractionView 
-          adUrl={adUrl} 
-          avatarState={avatarState}
-          setAvatarState={setAvatarState}
-          isMicActive={isMicActive}
-          isConnected={isConnected} 
-        />
-        <BackendSimulator 
-          currentMode={kioskMode}
-          setKioskMode={setKioskMode}
-          avatarState={avatarState}
-          setAvatarState={setAvatarState}
-          isMicActive={isMicActive}
-          setIsMicActive={setIsMicActive}
-        />
-      </div>
-    );
-  }
-
-  // Default to LoopView
   return (
-    <div className="relative w-full h-full flex flex-col bg-black overflow-hidden font-sans">
-      <LiveStatus isConnected={isConnected} />
-      <LoopView />
-      <BackendSimulator 
-          currentMode={kioskMode}
-          setKioskMode={setKioskMode}
-          avatarState={avatarState}
-          setAvatarState={setAvatarState}
-          isMicActive={isMicActive}
-          setIsMicActive={setIsMicActive}
-        />
+    <div className="w-screen h-screen bg-black overflow-hidden relative">
+      {/* 1. Dynamic Stage Rendering */}
+      {systemId === 1 && <LoopView />}
+      {systemId === 3 && <InteractionView adUrl={activeAd} avatarState={avatarState} />}
+
+      {/* 2. PRELOADING ENGINE: Forces browser to cache all .webm and .mp4 assets */}
+      <div className="hidden opacity-0 pointer-events-none absolute -z-50">
+        <video src="/avatar/wakeup.webm" preload="auto" muted />
+        <video src="/avatar/idle.webm" preload="auto" muted />
+        <video src="/avatar/talking.webm" preload="auto" muted />
+        <video src="/ads/10-15_female.mp4" preload="auto" muted />
+        {/* Add all other critical ads here to prevent lag */}
+      </div>
     </div>
   );
 }
