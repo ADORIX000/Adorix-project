@@ -77,14 +77,27 @@ class AdorixVision:
         detections = self.face_net.forward()
         
         bboxes = []
-        for i in range(detections.shape[2]):
-            confidence = detections[0, 0, i, 2]
-            if confidence > 0.5:
-                x1 = int(detections[0, 0, i, 3] * w)
-                y1 = int(detections[0, 0, i, 4] * h)
-                x2 = int(detections[0, 0, i, 5] * w)
-                y2 = int(detections[0, 0, i, 6] * h)
-                bboxes.append((max(0, x1), max(0, y1), min(w, x2), min(h, y2)))
+        try:
+            for i in range(detections.shape[2]):
+                confidence = detections[0, 0, i, 2]
+                if confidence > 0.5:
+                    x1 = detections[0, 0, i, 3] * w
+                    y1 = detections[0, 0, i, 4] * h
+                    x2 = detections[0, 0, i, 5] * w
+                    y2 = detections[0, 0, i, 6] * h
+
+                    if not (np.isfinite(x1) and np.isfinite(y1) and np.isfinite(x2) and np.isfinite(y2)):
+                        # print(f"[WARN] Infinite bbox coords: {x1}, {y1}, {x2}, {y2}")
+                        continue
+                    
+                    x1 = int(x1)
+                    y1 = int(y1)
+                    x2 = int(x2)
+                    y2 = int(y2)
+                    
+                    bboxes.append((max(0, x1), max(0, y1), min(w, x2), min(h, y2)))
+        except Exception as e:
+            print(f"[ERROR] Logic error in detect_faces: {e}")
         return bboxes
 
     def analyze(self, frame):
@@ -158,7 +171,7 @@ class AdorixVision:
                                 
                                 # Broadcast the winner to React
                                 self.broadcast({
-                                    "system_id": 2, 
+                                    "system_id": 1, 
                                     "demographics": [winning_demographic]
                                 })
                             
