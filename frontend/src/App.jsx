@@ -9,13 +9,14 @@ import BackendSimulator from './testing/BackendSimulator';
 
 export default function App() {
   // Connect to the FastAPI WebSocket server
-  const { isConnected, lastMessage } = useSocket('ws://localhost:8000/ws');
-  
+  const { isConnected, lastMessage } = useSocket('ws://localhost:8001/ws');
+
   // State variables controlled by the Python Backend OR the BackendSimulator
-  const [kioskMode, setKioskMode] = useState('INTERACTION'); // Defaulting to INTERACTION for testing
-  const [activeAd, setActiveAd] = useState('10-15_female.mp4');
-  const [avatarState, setAvatarState] = useState('WAKEUP');
+  const [kioskMode, setKioskMode] = useState('IDLE'); // Start in IDLE
+  const [activeAd, setActiveAd] = useState('16-29_female.mp4');
+  const [avatarState, setAvatarState] = useState('SLEEP');
   const [isMicActive, setIsMicActive] = useState(false);
+  const [subtitle, setSubtitle] = useState("");
 
   // Process incoming JSON signals from Python
   useEffect(() => {
@@ -24,6 +25,18 @@ export default function App() {
       if (lastMessage.type === 'PLAY_AD') setActiveAd(lastMessage.ad_url);
       if (lastMessage.type === 'AVATAR_SIGNAL') setAvatarState(lastMessage.state);
       if (lastMessage.type === 'MIC_STATUS') setIsMicActive(lastMessage.active);
+
+      // Handle the unified update type
+      if (lastMessage.type === 'SYSTEM_UPDATE') {
+        if (lastMessage.mode) setKioskMode(lastMessage.mode);
+        if (lastMessage.avatar_state) setAvatarState(lastMessage.avatar_state);
+        if (lastMessage.subtitle !== undefined) setSubtitle(lastMessage.subtitle);
+        // Sync ad with current_ad_json
+        if (lastMessage.current_ad_json) {
+          const adMp4 = lastMessage.current_ad_json.replace('.json', '.mp4');
+          setActiveAd(adMp4);
+        }
+      }
     }
   }, [lastMessage]);
 
@@ -39,7 +52,7 @@ export default function App() {
           adUrl={adUrl}
           isConnected={isConnected}
         />
-        <BackendSimulator 
+        <BackendSimulator
           currentMode={kioskMode}
           setKioskMode={setKioskMode}
           avatarState={avatarState}
@@ -55,14 +68,14 @@ export default function App() {
     return (
       <div className="relative w-full h-full flex flex-col bg-black overflow-hidden font-sans">
         <LiveStatus isConnected={isConnected} />
-        <InteractionView 
-          adUrl={adUrl} 
+        <InteractionView
+          adUrl={adUrl}
           avatarState={avatarState}
           setAvatarState={setAvatarState}
           isMicActive={isMicActive}
-          isConnected={isConnected} 
+          isConnected={isConnected}
         />
-        <BackendSimulator 
+        <BackendSimulator
           currentMode={kioskMode}
           setKioskMode={setKioskMode}
           avatarState={avatarState}
@@ -79,14 +92,14 @@ export default function App() {
     <div className="relative w-full h-full flex flex-col bg-black overflow-hidden font-sans">
       <LiveStatus isConnected={isConnected} />
       <LoopView />
-      <BackendSimulator 
-          currentMode={kioskMode}
-          setKioskMode={setKioskMode}
-          avatarState={avatarState}
-          setAvatarState={setAvatarState}
-          isMicActive={isMicActive}
-          setIsMicActive={setIsMicActive}
-        />
+      <BackendSimulator
+        currentMode={kioskMode}
+        setKioskMode={setKioskMode}
+        avatarState={avatarState}
+        setAvatarState={setAvatarState}
+        isMicActive={isMicActive}
+        setIsMicActive={setIsMicActive}
+      />
     </div>
   );
 }

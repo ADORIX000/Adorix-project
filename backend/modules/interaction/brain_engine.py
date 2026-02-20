@@ -15,7 +15,7 @@ class BrainEngine:
             "text-generation",
             model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
             model_kwargs={
-                "torch_dtype": torch.float16,
+                "dtype": torch.float16,
                 "low_cpu_mem_usage": True,
             },
             device_map="auto"
@@ -24,22 +24,36 @@ class BrainEngine:
 
     def load_context_from_json(self, json_filename):
         """
-        Loads the product description context from a specific JSON file.
+        Loads product details from ad_engine/data and builds context.
         """
-        # Ensure the filename has .json extension
         if not json_filename.endswith(".json"):
             json_filename += ".json"
             
-        # Path: backend/modules/interaction/data/{json_filename}
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        json_path = os.path.join(base_dir, "data", json_filename)
+        # Path: backend/modules/ad_engine/data/{json_filename}
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        json_path = os.path.join(base_dir, "ad_engine", "data", json_filename)
         
         try:
             with open(json_path, 'r') as f:
                 data = json.load(f)
-                # We expect the JSON to have a "context" field
-                context = data.get("context", "")
-                product_name = data.get("product", "this product")
+                
+                # If there's a dedicated 'context' field, use it
+                if "context" in data:
+                    context = data["context"]
+                else:
+                    # Otherwise, build it from product_name, description, features, and faqs
+                    name = data.get("product_name", "this product")
+                    desc = data.get("description", "")
+                    features = ", ".join(data.get("key_features", []))
+                    
+                    faqs_list = []
+                    for q, a in data.get("faqs", {}).items():
+                        faqs_list.append(f"Q: {q.replace('_', ' ')}? A: {a}")
+                    faqs_str = " ".join(faqs_list)
+                    
+                    context = f"Product: {name}. Description: {desc}. Features: {features}. FAQs: {faqs_str}"
+
+                product_name = data.get("product_name", data.get("product", "this product"))
                 print(f">>> [Brain] Loaded knowledge for: {product_name}")
                 return context
         except FileNotFoundError:
