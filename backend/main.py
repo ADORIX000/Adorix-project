@@ -27,10 +27,10 @@ system_state = {
     "mode": "IDLE",  # IDLE, INTERACTION
     "avatar_state": "SLEEP",
     "subtitle": "",
-    "current_ad_json": "gaming_ad.json", # Default JSON to load for RAG
+    "current_ad_json": "16-29_female.json", # Default to an existing JSON
     "product_data": {
-        "product": "Adorix Assistant",
-        "context": "I am Adorix, your intelligent AI assistant. I can answer questions about our services and help you navigate the system."
+        "product": "H&M Trend Capsule Outfit Set",
+        "context": "A modern capsule collection that helps you style multiple trendy looks with a few essential pieces."
     }
 }
 
@@ -39,7 +39,11 @@ wake_word_service = None
 main_loop = None # Added to capture the event loop from the main thread
 
 async def broadcast_state():
-    state_payload = json.dumps(system_state)
+    # Add a type field for the frontend to recognize the update
+    payload = system_state.copy()
+    payload["type"] = "SYSTEM_UPDATE"
+    state_payload = json.dumps(payload)
+
     if not connected_clients:
         return
     
