@@ -26,8 +26,9 @@ class BrainEngine:
         """
         Loads product details from ad_engine/data and builds context.
         """
-        if not json_filename.endswith(".json"):
-            json_filename += ".json"
+        # Strip extension if provided (e.g., "ad_name.mp4" -> "ad_name")
+        json_filename = os.path.splitext(json_filename)[0]
+        json_filename += ".json"
             
         # Path: backend/modules/ad_engine/data/{json_filename}
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

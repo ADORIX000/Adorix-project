@@ -1,0 +1,14 @@
+{
+    "product_name": "Instax Mini 12 Instant Camera",
+    "description": "The Fujifilm Instax Mini 12 is a cute and easy-to-use instant camera that lets you capture and keep memories instantly.",
+    "key_features": [
+        "Automatic exposure",
+        "Selfie mode with built-in mirror",
+        "Vibrant pastel colors",
+        "Credit-card sized instant prints"
+    ],
+    "faqs": {
+        "does_it_need_film": "Yes, it uses Instax Mini instant film.",
+        "battery_type": "It uses two AA alkaline batteries."
+    }
+}
