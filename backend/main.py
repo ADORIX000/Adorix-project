@@ -20,147 +20,204 @@ if modules_dir not in sys.path:
 # Local modules
 from wake_word import WakeWordService
 from interaction.interaction_manager import start_interaction_loop
-from interaction.tts_engine import speak
 from vision_service import AdorixVision
 
 # --- Global System State ---
-system_state = {
-    "system_id": 1,  # 1: Loop, 2: Personalized, 3: Interaction
-    "mode": "IDLE",  # IDLE, INTERACTION
-    "avatar_state": "SLEEP",
-    "subtitle": "",
-    "current_ad_json": "16-29_female.json", # Default to an existing JSON
-    "product_data": {
-        "product": "H&M Trend Capsule Outfit Set",
-        "context": "A modern capsule collection that helps you style multiple trendy looks with a few essential pieces."
-    }
-}
+class SystemState:
+    def __init__(self):
+        self.system_id = 1             # 1: Loop, 2: Personalized, 3: Interaction
+        self.mode = "IDLE"             # IDLE, INTERACTION
+        self.avatar_state = "SLEEP"
+        self.subtitle = ""
+        self.ad_url = ""               # Current ad URL
+        
+        # Thread locks
+        self.lock = threading.Lock()
 
+state = SystemState()
 connected_clients = []
+main_loop = None 
 wake_word_service = None
 vision_service = None
-main_loop = None # Added to capture the event loop from the main thread
 
-async def broadcast_state():
-    # Add a type field for the frontend to recognize the update
-    payload = system_state.copy()
-    payload["type"] = "SYSTEM_UPDATE"
-    state_payload = json.dumps(payload)
-
-    if not connected_clients:
-        return
+# --- Hardware Services Reset Helpers ---
+def restart_wake_word_service():
+    """Safely stop and restart the wake word service."""
+    global wake_word_service
     
-    # Create a list of tasks for broadcasting
+    if wake_word_service:
+        try:
+            wake_word_service.stop()
+        except:
+            pass
+            
+    print(">>> [System] Starting Wake Word Service...")
+    wake_word_service = WakeWordService(callback_function=on_wake_word)
+    threading.Thread(target=wake_word_service.start, daemon=True).start()
+
+def stop_wake_word_service():
+    global wake_word_service
+    if wake_word_service:
+        print(">>> [System] Stopping Wake Word Service (Microphone released for STT)")
+        try:
+            wake_word_service.stop()
+        except:
+            pass
+        wake_word_service = None
+
+# --- WebSocket Broadcast ---
+async def broadcast_state():
+    with state.lock:
+        payload = {
+            "type": "SYSTEM_UPDATE",
+            "system_id": state.system_id,
+            "mode": state.mode,
+            "avatar_state": state.avatar_state,
+            "subtitle": state.subtitle,
+            "ad_url": state.ad_url
+        }
+    
+    state_payload = json.dumps(payload)
+    if not connected_clients: return
+    
     tasks = [client.send_text(state_payload) for client in connected_clients]
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
 
 def sync_broadcast():
-    """Helper to broadcast state from synchronous code/threads"""
     global main_loop
     if main_loop:
         try:
-            # Safely schedule the coroutine in the main loop
             asyncio.run_coroutine_threadsafe(broadcast_state(), main_loop)
         except Exception as e:
             print(f"!!! [Broadcast] Error: {e}")
-    else:
-        print("!!! [Broadcast] Main event loop not captured yet.")
 
+# --- Callbacks ---
 def interaction_state_callback(avatar_state=None, subtitle=None):
-    global system_state
-    if avatar_state:
-        system_state["avatar_state"] = avatar_state
-    if subtitle is not None:
-        system_state["subtitle"] = subtitle
-    
-    print(f">>> [System] State Update: {avatar_state} | {subtitle}")
+    with state.lock:
+        if avatar_state: state.avatar_state = avatar_state
+        if subtitle is not None: state.subtitle = subtitle
     sync_broadcast()
 
 def on_vision_update(data):
-    """Callback for AdorixVision detections."""
-    global system_state
-    
+    """
+    Central State Machine rules defined here in the Vision Callback.
+    Rules: 
+      Loop(1) -> Personalized(2) [If face detected]
+      Personalized(2) -> Loop(1) [If face lost - Immediately]
+      Interaction(3) -> Loop(1)  [If face lost - Immediately, aborts Interaction Thread]
+    """
     new_id = data.get("system_id")
+    ad_url = data.get("ad_url", "")
     
-    # ONLY allow switching to Personalized Mode (2) if we are in Loop Mode (1)
-    if new_id == 2 and system_state["system_id"] == 1:
-        print(f">>> [Vision] Triggering Personalized Mode: {data.get('ad_url')}")
-        system_state["system_id"] = 2
-        system_state["ad_url"] = data.get("ad_url")
-        sync_broadcast()
-    
-    # If vision loses person (1) and we are in Personalized Mode (2), 
-    # we DON'T revert immediately. We let the ad finish its loops.
-    # Exception: if we are in Loop Mode (1) and vision is 1, keep it 1.
-    elif new_id == 1 and system_state["system_id"] == 1:
-        # Already in 1, no need to broadcast frequently if nothing changed
-        pass
+    with state.lock:
+        current_id = state.system_id
+        
+        # 1 -> 2: Transition from Loop to Personalized Ad
+        if current_id == 1 and new_id == 2:
+            print(f"\n>>> [State Machine] Loop -> Personalized (Ad: {ad_url})")
+            state.system_id = 2
+            state.ad_url = ad_url
+            sync_broadcast()
+            
+        # X -> 1: Transition back to Loop Mode (Face Lost)
+        elif new_id == 1 and current_id in [2, 3]:
+            print("\n>>> [State Machine] User Left Frame. Reverting -> Loop Mode")
+            state.system_id = 1
+            state.mode = "IDLE"
+            state.avatar_state = "SLEEP"
+            state.subtitle = ""
+            state.ad_url = ""
+            sync_broadcast()
+            
+            # If we were in interaction mode, the mic was locked for STT. 
+            # We must restart the wake word scanner so the next person can use it.
+            if current_id == 3:
+                restart_wake_word_service()
 
 def on_wake_word():
-    global system_state, wake_word_service
-    if system_state["mode"] == "IDLE":
-        print(">>> [WAKE] Switching to INTERACTION mode")
-        system_state["mode"] = "INTERACTION"
-        system_state["system_id"] = 3
-        system_state["avatar_state"] = "WAKE"
-        system_state["subtitle"] = "Yes? I'm listening..."
+    """
+    Called when Wake Word is detected.
+    Transitions: 2 -> 3 (Personalized -> Interaction)
+    """
+    with state.lock:
+        if state.system_id != 2:
+            # According to rules, Wake Word is only valid when in Personalized Mode
+            return
+            
+        print("\n>>> [State Machine] Wake Word Detected! Personalized -> Interaction")
+        state.system_id = 3
+        state.mode = "INTERACTION"
+        state.avatar_state = "WAKE"
+        state.subtitle = "Yes? I'm listening..."
+        current_ad = state.ad_url
         
-        sync_broadcast()
-        
-        # Stop the wake word service so STT can use the microphone
-        if wake_word_service:
-            wake_word_service.stop()
-            wake_word_service = None
-        
-        # Start the interaction loop in a SEPARATE thread
-        threading.Thread(target=handle_interaction, daemon=True).start()
+    sync_broadcast()
+    
+    # Instantly stop wake word to free the Microphone for the STT engine
+    stop_wake_word_service()
+    
+    # Spawn the LLM/QA Interaction loop in a separate thread so vision stays non-blocking
+    threading.Thread(target=handle_interaction, args=(current_ad,), daemon=True).start()
 
-def handle_interaction():
-    global system_state, wake_word_service
+def handle_interaction(ad_url):
+    """
+    Runs the full Interaction Loop (STT -> LLM -> TTS).
+    Aborts instantly if state.system_id changes away from 3 (User walked away).
+    """
     try:
-        # This runs the interaction loop (STT -> LLM -> TTS)
+        # Pass the abort checker function to the loop
+        is_active = lambda: state.system_id == 3
+        
         result = start_interaction_loop(
-            system_state["current_ad_json"], 
-            state_callback=interaction_state_callback
+            current_ad_name=ad_url, 
+            state_callback=interaction_state_callback,
+            is_active_callback=is_active
         )
-        print(f">>> [Interaction] Loop ended with: {result}")
+        print(f"\n>>> [Interaction Thread] Finished with reason: {result}")
+        
     except Exception as e:
-        print(f"!!! [Interaction] Critical error in loop: {e}")
+        print(f"\n!!! [Interaction Thread] Critical Error: {e}")
+        
     finally:
-        system_state["mode"] = "IDLE"
-        system_state["system_id"] = 1
-        system_state["avatar_state"] = "SLEEP"
-        system_state["subtitle"] = ""
-        sync_broadcast()
+        # Only transition back to LOOP if we are STILL in Interaction mode.
+        # If the user already walked away, vision sets it to 1, and we just quietly die.
+        with state.lock:
+            if state.system_id == 3:
+                print("\n>>> [State Machine] Interaction Finished natively. Reverting -> Loop Mode")
+                state.system_id = 1
+                state.mode = "IDLE"
+                state.avatar_state = "SLEEP"
+                state.subtitle = ""
+                state.ad_url = ""
+                sync_broadcast()
+                
+                # Restart the wake word service for the next cycle
+                restart_wake_word_service()
 
-        # Restart the wake word service so it can listen again
-        print(">>> [System] Restarting Wake Word Service...")
-        wake_word_service = WakeWordService(callback_function=on_wake_word)
-        threading.Thread(target=wake_word_service.start, daemon=True).start()
-
+# --- Server Lifecycle Integration ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global wake_word_service, main_loop
-    # Capture the main event loop
+    global main_loop, vision_service
+    # Capture the main asyncio event loop so threads can broadcast safely
     main_loop = asyncio.get_running_loop()
     
-    # Initialize wake word
-    wake_word_service = WakeWordService(callback_function=on_wake_word)
-    threading.Thread(target=wake_word_service.start, daemon=True).start()
+    print("\n" + "="*50)
+    print("🚀 ADORIX INTEGRATED SYSTEM INITIALIZING")
+    print("="*50)
     
-    # Initialize vision service
+    # 1. Start Wake Word listener
+    restart_wake_word_service()
+    
+    # 2. Start Vision camera thread
     vision_service = AdorixVision(broadcast_callback=on_vision_update)
     threading.Thread(target=vision_service.start, daemon=True).start()
     
-    print(">>> [System] Adorix Assistant Ready (Vision & Wake Word Active)")
     yield
-    # Cleanup
-    if wake_word_service:
-        try:
-            wake_word_service.stop()
-        except Exception as e:
-            print(f">>> [Cleanup] Wake Word stop error: {e}")
+    
+    # Cleanup on shutdown
+    print(">>> [Cleanup] Shutting down Adorix gracefully...")
+    stop_wake_word_service()
 
 app = FastAPI(lifespan=lifespan)
 
@@ -180,15 +237,30 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connected_clients.append(websocket)
     try:
-        await websocket.send_text(json.dumps(system_state))
+        # Send initial state
+        with state.lock:
+            init_payload = {
+                "type": "SYSTEM_UPDATE",
+                "system_id": state.system_id,
+                "mode": state.mode,
+                "avatar_state": state.avatar_state,
+                "subtitle": state.subtitle,
+                "ad_url": state.ad_url
+            }
+        await websocket.send_text(json.dumps(init_payload))
+        
         while True:
             data = await websocket.receive_text()
             try:
                 msg = json.loads(data)
+                # AD_LOOP_TIMEOUT from frontend
                 if msg.get("type") == "AD_LOOP_TIMEOUT":
-                    print(">>> [System] Ad Loop Timeout: Reverting to Loop Mode")
-                    system_state["system_id"] = 1
-                    await broadcast_state()
+                    with state.lock:
+                        if state.system_id == 2:
+                            print("\n>>> [State Machine] Personalized Ad Timeout. Reverting -> Loop Mode")
+                            state.system_id = 1
+                            state.ad_url = ""
+                    sync_broadcast()
             except Exception as e:
                 print(f"!!! [WS] Error parsing message: {e}")
     except WebSocketDisconnect:

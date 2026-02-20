@@ -5,14 +5,20 @@ import LiveStatus from "../components/LiveStatus";
 export default function PersonalizedView({ systemState, isConnected, sendJsonMessage }) {
   const [loopCount, setLoopCount] = React.useState(0);
 
-  const handleAdEnd = () => {
+  const handleAdEnd = (e) => {
     const nextCount = loopCount + 1;
     setLoopCount(nextCount);
     console.log(`[Personalized] Ad loop count: ${nextCount}`);
     
+    // We hit 2 loops. Tell backend we are done, allowing it to revert if no user is present.
     if (nextCount >= 2) {
         console.log("[Personalized] Reached 2 loops, triggering timeout...");
         sendJsonMessage({ type: "AD_LOOP_TIMEOUT" });
+    } else {
+        // Explicitly play again for loop 2
+        if (e && e.target) {
+            e.target.play().catch(err => console.error("Error playing ad:", err));
+        }
     }
   };
 
