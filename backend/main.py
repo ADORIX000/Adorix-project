@@ -21,6 +21,7 @@ if modules_dir not in sys.path:
 from wake_word import WakeWordService
 from interaction.interaction_manager import start_interaction_loop
 from interaction.tts_engine import speak
+from vision_service import AdorixVision
 
 # --- Global System State ---
 system_state = {
@@ -36,6 +37,7 @@ system_state = {
 
 connected_clients = []
 wake_word_service = None
+vision_service = None
 main_loop = None # Added to capture the event loop from the main thread
 
 async def broadcast_state():
@@ -72,6 +74,21 @@ def interaction_state_callback(avatar_state=None, subtitle=None):
         system_state["subtitle"] = subtitle
     
     print(f">>> [System] State Update: {avatar_state} | {subtitle}")
+    sync_broadcast()
+
+def on_vision_update(data):
+    """Callback for AdorixVision detections."""
+    global system_state
+    # Update global state with vision data (system_id, ad_url, etc.)
+    system_state.update(data)
+    
+    # Optional: Log the switch
+    if data.get("system_id") == 2:
+        print(f">>> [Vision] Personalized Mode Active: {data.get('ad_url')}")
+    elif data.get("system_id") == 1:
+        # Reverting to Loop mode
+        pass
+        
     sync_broadcast()
 
 def on_wake_word():
@@ -113,11 +130,19 @@ async def lifespan(app: FastAPI):
     # Initialize wake word
     wake_word_service = WakeWordService(callback_function=on_wake_word)
     threading.Thread(target=wake_word_service.start, daemon=True).start()
-    print(">>> [System] Adorix Assistant Ready (Wake Word Active)")
+    
+    # Initialize vision service
+    vision_service = AdorixVision(broadcast_callback=on_vision_update)
+    threading.Thread(target=vision_service.start, daemon=True).start()
+    
+    print(">>> [System] Adorix Assistant Ready (Vision & Wake Word Active)")
     yield
     # Cleanup
     if wake_word_service:
-        wake_word_service.stop()
+        try:
+            wake_word_service.stop()
+        except Exception as e:
+            print(f">>> [Cleanup] Wake Word stop error: {e}")
 
 app = FastAPI(lifespan=lifespan)
 
