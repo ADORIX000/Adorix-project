@@ -9,7 +9,7 @@ export default function App() {
   const [systemId, setSystemId] = useState(1);
   const [activeAd, setActiveAd] = useState('10-15_female.mp4');
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
-  const { lastMessage } = useSocket('ws://localhost:8000/ws');
+  const { lastMessage, sendJsonMessage } = useSocket('ws://localhost:8001/ws');
 
   useEffect(() => {
     if (lastMessage) {
@@ -23,7 +23,13 @@ export default function App() {
     <div className="w-screen h-screen bg-black overflow-hidden relative">
       {/* 1. Dynamic Stage Rendering */}
       {systemId === 1 && <LoopView />}
-      {systemId === 2 && <PersonalizedView systemState={{ ad: activeAd }} isConnected={!!lastMessage} />}
+      {systemId === 2 && (
+        <PersonalizedView 
+            systemState={{ ad: activeAd }} 
+            isConnected={!!lastMessage} 
+            sendJsonMessage={sendJsonMessage}
+        />
+      )}
       {systemId === 3 && <InteractionView adUrl={activeAd} avatarState={avatarState} />}
 
       {/* 2. PRELOADING ENGINE: Forces browser to cache all .webm and .mp4 assets */}

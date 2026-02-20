@@ -25,6 +25,7 @@ from vision_service import AdorixVision
 
 # --- Global System State ---
 system_state = {
+    "system_id": 1,  # 1: Loop, 2: Personalized, 3: Interaction
     "mode": "IDLE",  # IDLE, INTERACTION
     "avatar_state": "SLEEP",
     "subtitle": "",
@@ -79,23 +80,29 @@ def interaction_state_callback(avatar_state=None, subtitle=None):
 def on_vision_update(data):
     """Callback for AdorixVision detections."""
     global system_state
-    # Update global state with vision data (system_id, ad_url, etc.)
-    system_state.update(data)
     
-    # Optional: Log the switch
-    if data.get("system_id") == 2:
-        print(f">>> [Vision] Personalized Mode Active: {data.get('ad_url')}")
-    elif data.get("system_id") == 1:
-        # Reverting to Loop mode
+    new_id = data.get("system_id")
+    
+    # ONLY allow switching to Personalized Mode (2) if we are in Loop Mode (1)
+    if new_id == 2 and system_state["system_id"] == 1:
+        print(f">>> [Vision] Triggering Personalized Mode: {data.get('ad_url')}")
+        system_state["system_id"] = 2
+        system_state["ad_url"] = data.get("ad_url")
+        sync_broadcast()
+    
+    # If vision loses person (1) and we are in Personalized Mode (2), 
+    # we DON'T revert immediately. We let the ad finish its loops.
+    # Exception: if we are in Loop Mode (1) and vision is 1, keep it 1.
+    elif new_id == 1 and system_state["system_id"] == 1:
+        # Already in 1, no need to broadcast frequently if nothing changed
         pass
-        
-    sync_broadcast()
 
 def on_wake_word():
     global system_state
     if system_state["mode"] == "IDLE":
         print(">>> [WAKE] Switching to INTERACTION mode")
         system_state["mode"] = "INTERACTION"
+        system_state["system_id"] = 3
         system_state["avatar_state"] = "WAKE"
         system_state["subtitle"] = "Yes? I'm listening..."
         
@@ -117,6 +124,7 @@ def handle_interaction():
         print(f"!!! [Interaction] Critical error in loop: {e}")
     finally:
         system_state["mode"] = "IDLE"
+        system_state["system_id"] = 1
         system_state["avatar_state"] = "SLEEP"
         system_state["subtitle"] = ""
         sync_broadcast()
@@ -164,7 +172,15 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         await websocket.send_text(json.dumps(system_state))
         while True:
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            try:
+                msg = json.loads(data)
+                if msg.get("type") == "AD_LOOP_TIMEOUT":
+                    print(">>> [System] Ad Loop Timeout: Reverting to Loop Mode")
+                    system_state["system_id"] = 1
+                    await broadcast_state()
+            except Exception as e:
+                print(f"!!! [WS] Error parsing message: {e}")
     except WebSocketDisconnect:
         connected_clients.remove(websocket)
 

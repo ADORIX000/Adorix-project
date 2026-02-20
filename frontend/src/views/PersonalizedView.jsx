@@ -2,7 +2,20 @@ import React from "react";
 import AdPlayer from "../components/AdPlayer";
 import LiveStatus from "../components/LiveStatus";
 
-export default function PersonalizedView({ systemState, isConnected, onAdEnd }) {
+export default function PersonalizedView({ systemState, isConnected, sendJsonMessage }) {
+  const [loopCount, setLoopCount] = React.useState(0);
+
+  const handleAdEnd = () => {
+    const nextCount = loopCount + 1;
+    setLoopCount(nextCount);
+    console.log(`[Personalized] Ad loop count: ${nextCount}`);
+    
+    if (nextCount >= 2) {
+        console.log("[Personalized] Reached 2 loops, triggering timeout...");
+        sendJsonMessage({ type: "AD_LOOP_TIMEOUT" });
+    }
+  };
+
   return (
     <div style={styles.wrap}>
       {/* CSS for the Task #9 Pulse Animation */}
@@ -18,9 +31,9 @@ export default function PersonalizedView({ systemState, isConnected, onAdEnd }) 
 
       {/* Renders the ad and triggers the next one in the playlist when finished */}
       <AdPlayer
-        src={systemState.ad}
+        src={systemState.ad ? `/ads/${systemState.ad}` : ""}
         show={true}
-        onEnded={onAdEnd}
+        onEnded={handleAdEnd}
       />
 
       <LiveStatus isConnected={isConnected} />
@@ -32,7 +45,7 @@ export default function PersonalizedView({ systemState, isConnected, onAdEnd }) 
 
       {/* Task #9: Bottom-Center Interaction Prompt */}
       <div style={styles.promptBadge}>
-        <span style={styles.promptText}>"Hey Adorix"</span>
+        <span style={styles.promptText}>"Hey Adorix to interact"</span>
       </div>
     </div>
   );
