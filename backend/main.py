@@ -98,7 +98,7 @@ def on_vision_update(data):
         pass
 
 def on_wake_word():
-    global system_state
+    global system_state, wake_word_service
     if system_state["mode"] == "IDLE":
         print(">>> [WAKE] Switching to INTERACTION mode")
         system_state["mode"] = "INTERACTION"
@@ -108,11 +108,16 @@ def on_wake_word():
         
         sync_broadcast()
         
-        # Start the interaction loop in a SEPARATE thread to not block the wake word service
+        # Stop the wake word service so STT can use the microphone
+        if wake_word_service:
+            wake_word_service.stop()
+            wake_word_service = None
+        
+        # Start the interaction loop in a SEPARATE thread
         threading.Thread(target=handle_interaction, daemon=True).start()
 
 def handle_interaction():
-    global system_state
+    global system_state, wake_word_service
     try:
         # This runs the interaction loop (STT -> LLM -> TTS)
         result = start_interaction_loop(
@@ -128,6 +133,11 @@ def handle_interaction():
         system_state["avatar_state"] = "SLEEP"
         system_state["subtitle"] = ""
         sync_broadcast()
+
+        # Restart the wake word service so it can listen again
+        print(">>> [System] Restarting Wake Word Service...")
+        wake_word_service = WakeWordService(callback_function=on_wake_word)
+        threading.Thread(target=wake_word_service.start, daemon=True).start()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
