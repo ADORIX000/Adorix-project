@@ -1,1 +1,48 @@
+# OS Files
 .DS_Store
+Thumbs.db
+Desktop.ini
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python (Common)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Adorix Specific - Large Models & Data
+*.caffemodel
+*.prototxt
+*.pb
+*.pbtxt
+*.tflite
+*.h5
+*.keras
+*.onnx
+
+# Sensitive
+.env
+.env.*
+!.env.example

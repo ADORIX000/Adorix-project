@@ -1,7 +1,0 @@
-export const AVATAR_STATE = {
-  IDLE: "IDLE",
-  LISTENING: "LISTENING",
-  TALKING: "TALKING",
-  SHOW_AD: "SHOW_AD",
-  ERROR: "ERROR",
-};

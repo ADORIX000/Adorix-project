@@ -17,11 +17,12 @@ class AgeGenderDetector:
     """
 
     def __init__(self):
-        # Project root = two levels up from services/vision/
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        self.PROJECT_ROOT = base_dir
+        # detector.py is in backend/modules/vision/
+        current_module_dir = os.path.dirname(os.path.abspath(__file__))
+        # Project root is 4 levels up from this file
+        self.PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-        self.MODEL_PATH = os.path.join(self.PROJECT_ROOT, "services", "vision", "models") + os.sep
+        self.MODEL_PATH = os.path.join(current_module_dir, "models") + os.sep
         self.SHARED_DIR = os.path.join(self.PROJECT_ROOT, "shared")
         self.SHARED_JSON = os.path.join(self.SHARED_DIR, "current_users.json")
         os.makedirs(self.SHARED_DIR, exist_ok=True)

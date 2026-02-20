@@ -21,25 +21,32 @@ if modules_dir not in sys.path:
 from wake_word import WakeWordService
 from interaction.interaction_manager import start_interaction_loop
 from interaction.tts_engine import speak
+from vision_service import AdorixVision
 
 # --- Global System State ---
 system_state = {
+    "system_id": 1,  # 1: Loop, 2: Personalized, 3: Interaction
     "mode": "IDLE",  # IDLE, INTERACTION
     "avatar_state": "SLEEP",
     "subtitle": "",
-    "current_ad_json": "gaming_ad.json", # Default JSON to load for RAG
+    "current_ad_json": "16-29_female.json", # Default to an existing JSON
     "product_data": {
-        "product": "Adorix Assistant",
-        "context": "I am Adorix, your intelligent AI assistant. I can answer questions about our services and help you navigate the system."
+        "product": "H&M Trend Capsule Outfit Set",
+        "context": "A modern capsule collection that helps you style multiple trendy looks with a few essential pieces."
     }
 }
 
 connected_clients = []
 wake_word_service = None
+vision_service = None
 main_loop = None # Added to capture the event loop from the main thread
 
 async def broadcast_state():
-    state_payload = json.dumps(system_state)
+    # Add a type field for the frontend to recognize the update
+    payload = system_state.copy()
+    payload["type"] = "SYSTEM_UPDATE"
+    state_payload = json.dumps(payload)
+
     if not connected_clients:
         return
     
@@ -70,11 +77,32 @@ def interaction_state_callback(avatar_state=None, subtitle=None):
     print(f">>> [System] State Update: {avatar_state} | {subtitle}")
     sync_broadcast()
 
+def on_vision_update(data):
+    """Callback for AdorixVision detections."""
+    global system_state
+    
+    new_id = data.get("system_id")
+    
+    # ONLY allow switching to Personalized Mode (2) if we are in Loop Mode (1)
+    if new_id == 2 and system_state["system_id"] == 1:
+        print(f">>> [Vision] Triggering Personalized Mode: {data.get('ad_url')}")
+        system_state["system_id"] = 2
+        system_state["ad_url"] = data.get("ad_url")
+        sync_broadcast()
+    
+    # If vision loses person (1) and we are in Personalized Mode (2), 
+    # we DON'T revert immediately. We let the ad finish its loops.
+    # Exception: if we are in Loop Mode (1) and vision is 1, keep it 1.
+    elif new_id == 1 and system_state["system_id"] == 1:
+        # Already in 1, no need to broadcast frequently if nothing changed
+        pass
+
 def on_wake_word():
     global system_state
     if system_state["mode"] == "IDLE":
         print(">>> [WAKE] Switching to INTERACTION mode")
         system_state["mode"] = "INTERACTION"
+        system_state["system_id"] = 3
         system_state["avatar_state"] = "WAKE"
         system_state["subtitle"] = "Yes? I'm listening..."
         
@@ -96,6 +124,7 @@ def handle_interaction():
         print(f"!!! [Interaction] Critical error in loop: {e}")
     finally:
         system_state["mode"] = "IDLE"
+        system_state["system_id"] = 1
         system_state["avatar_state"] = "SLEEP"
         system_state["subtitle"] = ""
         sync_broadcast()
@@ -109,11 +138,19 @@ async def lifespan(app: FastAPI):
     # Initialize wake word
     wake_word_service = WakeWordService(callback_function=on_wake_word)
     threading.Thread(target=wake_word_service.start, daemon=True).start()
-    print(">>> [System] Adorix Assistant Ready (Wake Word Active)")
+    
+    # Initialize vision service
+    vision_service = AdorixVision(broadcast_callback=on_vision_update)
+    threading.Thread(target=vision_service.start, daemon=True).start()
+    
+    print(">>> [System] Adorix Assistant Ready (Vision & Wake Word Active)")
     yield
     # Cleanup
     if wake_word_service:
-        wake_word_service.stop()
+        try:
+            wake_word_service.stop()
+        except Exception as e:
+            print(f">>> [Cleanup] Wake Word stop error: {e}")
 
 app = FastAPI(lifespan=lifespan)
 
@@ -135,7 +172,15 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         await websocket.send_text(json.dumps(system_state))
         while True:
-            await websocket.receive_text()
+            data = await websocket.receive_text()
+            try:
+                msg = json.loads(data)
+                if msg.get("type") == "AD_LOOP_TIMEOUT":
+                    print(">>> [System] Ad Loop Timeout: Reverting to Loop Mode")
+                    system_state["system_id"] = 1
+                    await broadcast_state()
+            except Exception as e:
+                print(f"!!! [WS] Error parsing message: {e}")
     except WebSocketDisconnect:
         connected_clients.remove(websocket)
 

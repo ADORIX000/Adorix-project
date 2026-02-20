@@ -36,11 +36,11 @@ class WakeWordService:
                 access_key=self.ACCESS_KEY, 
                 keyword_paths=[keyword_path]
             )
-            self.recorder = PvRecorder(device_index=-1, frame_length=self.porcupine.frame_length)
+            self.recorder = PvRecorder(device_index=0, frame_length=self.porcupine.frame_length)
             self.recorder.start()
             
             print(f">>> [Wake Word] Service Started. Listening for 'Hey Adorix'...")
-
+            
             while not self.stop_program:
                 if self.recorder and self.porcupine:
                     pcm = self.recorder.read()
