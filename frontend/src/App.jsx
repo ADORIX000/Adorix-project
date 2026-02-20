@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSocket } from './hooks/useSocket';
 import { AVATAR_STATES } from './avatar/avatarStates';
 import LoopView from './views/LoopView';
+import PersonalizedView from './views/PersonalizedView';
 import InteractionView from './views/InteractionView';
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
     <div className="w-screen h-screen bg-black overflow-hidden relative">
       {/* 1. Dynamic Stage Rendering */}
       {systemId === 1 && <LoopView />}
+      {systemId === 2 && <PersonalizedView systemState={{ ad: activeAd }} isConnected={!!lastMessage} />}
       {systemId === 3 && <InteractionView adUrl={activeAd} avatarState={avatarState} />}
 
       {/* 2. PRELOADING ENGINE: Forces browser to cache all .webm and .mp4 assets */}

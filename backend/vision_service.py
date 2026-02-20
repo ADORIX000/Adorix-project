@@ -4,12 +4,19 @@ import time
 import os
 import numpy as np
 from collections import Counter # <-- NEW: For calculating the majority vote
+from modules.ad_engine.selector import AdSelector
 
 class AdorixVision:
     def __init__(self, broadcast_callback):
         self.broadcast = broadcast_callback
         self.last_analysis = 0
         self.is_analyzing = False
+        
+        # --- NEW: AD SELECTOR INITIALIZATION ---
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        rules_path = os.path.join(current_dir, "modules", "ad_engine", "rules.json")
+        ads_dir = os.path.join(current_dir, "ads") # Or wherever your ads are stored
+        self.selector = AdSelector(rules_path, ads_dir)
         
         # --- NEW: BUFFER STATE VARIABLES ---
         self.detection_buffer = []      # Holds all predictions made in the 2-second window
@@ -169,9 +176,13 @@ class AdorixVision:
                                 
                                 print(f"\n[WINNER] 2-Sec Analysis complete: {winning_demographic}")
                                 
-                                # Broadcast the winner to React
+                                # Select the ad using the selector
+                                ad_name = self.selector.get_personalized_ad(winning_demographic)
+                                
+                                # Broadcast the winner to React with system_id: 2 (Personalized Mode)
                                 self.broadcast({
-                                    "system_id": 1, 
+                                    "system_id": 2, 
+                                    "ad_url": ad_name,
                                     "demographics": [winning_demographic]
                                 })
                             

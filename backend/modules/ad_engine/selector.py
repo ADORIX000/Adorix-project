@@ -55,5 +55,19 @@ class AdSelector:
         key = f"{primary.get('gender')}_{primary.get('age')}"
         return self.rules.get(key, self.rules.get("DEFAULT", "generic_ad.mp4"))
 
+    def get_personalized_ad(self, demographic_key: str) -> str:
+        """Takes a demographic string (e.g., '10-15_male') and returns the ad filename."""
+        if not demographic_key:
+            return self.rules.get("DEFAULT", "generic_ad.mp4")
+        
+        # According to requirements: "add .mp4 for make the ad name"
+        filename = f"{demographic_key}.mp4"
+        
+        # Optional: check if file exists in ads_dir, otherwise fallback to rules or default
+        if os.path.isfile(os.path.join(self.ads_dir, filename)):
+            return filename
+            
+        return self.rules.get(demographic_key, self.rules.get("DEFAULT", "generic_ad.mp4"))
+
     def ad_path(self, filename: str) -> str:
         return os.path.join(self.ads_dir, filename)
