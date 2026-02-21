@@ -37,7 +37,7 @@ class WakeWordService:
             )
             
             # 3. Initialize Recorder using the DEFAULT microphone (index -1)
-            self.recorder = PvRecorder(device_index=0, frame_length=self.porcupine.frame_length)
+            self.recorder = PvRecorder(device_index=2, frame_length=self.porcupine.frame_length)
             self.recorder.start()
             
             print(f">>> [Wake Word] Service Started. Listening for 'Hey Adorix'...")
