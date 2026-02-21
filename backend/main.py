@@ -27,7 +27,7 @@ class SystemState:
     def __init__(self):
         self.system_id = 1             # 1: Loop, 2: Personalized, 3: Interaction
         self.mode = "IDLE"             # IDLE, INTERACTION
-        self.avatar_state = "SLEEP"
+        self.avatar_state = "HIDDEN"
         self.subtitle = ""
         self.ad_url = ""               # Current ad URL
         
@@ -39,7 +39,7 @@ connected_clients = []
 main_loop = None 
 wake_word_service = None
 vision_service = None
-
+  
 # --- Hardware Services Reset Helpers ---
 def restart_wake_word_service():
     """Safely stop and restart the wake word service."""
@@ -104,7 +104,7 @@ def on_vision_update(data):
     Central State Machine rules defined here in the Vision Callback.
     Rules: 
       Loop(1) -> Personalized(2) [If face detected]
-      Personalized(2) -> Loop(1) [If face lost - Immediately]
+      Personalized(2) -> Loop(1) [Triggered by frontend AD_LOOP_TIMEOUT after 2 loops]
       Interaction(3) -> Loop(1)  [If face lost - Immediately, aborts Interaction Thread]
     """
     new_id = data.get("system_id")
@@ -120,8 +120,9 @@ def on_vision_update(data):
             state.ad_url = ad_url
             sync_broadcast()
             
-        # X -> 1: Transition back to Loop Mode (Face Lost)
-        elif new_id == 1 and current_id in [2, 3]:
+        # 3 -> 1: Transition back to Loop Mode (Face Lost)
+        # Note: Personalized(2) ignores Face Lost; it waits for frontend AD_LOOP_TIMEOUT after 2 loops.
+        elif new_id == 1 and current_id == 3:
             print("\n>>> [State Machine] User Left Frame. Reverting -> Loop Mode")
             state.system_id = 1
             state.mode = "IDLE"
@@ -132,8 +133,7 @@ def on_vision_update(data):
             
             # If we were in interaction mode, the mic was locked for STT. 
             # We must restart the wake word scanner so the next person can use it.
-            if current_id == 3:
-                restart_wake_word_service()
+            restart_wake_word_service()
 
 def on_wake_word():
     """
@@ -257,8 +257,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 if msg.get("type") == "AD_LOOP_TIMEOUT":
                     with state.lock:
                         if state.system_id == 2:
-                            print("\n>>> [State Machine] Personalized Ad Timeout. Reverting -> Loop Mode")
+                            print("\n>>> [State Machine] Personalized Ad Timeout (Played twice). Reverting -> Loop Mode")
                             state.system_id = 1
+                            state.mode = "IDLE"
+                            state.avatar_state = "SLEEP"
+                            state.subtitle = ""
                             state.ad_url = ""
                     sync_broadcast()
             except Exception as e:
