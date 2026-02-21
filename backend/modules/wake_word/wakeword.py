@@ -1,8 +1,6 @@
 import pvporcupine
 from pvrecorder import PvRecorder
 import os
-import threading
-import time
 
 class WakeWordService:
     def __init__(self, callback_function=None):
@@ -31,30 +29,36 @@ class WakeWordService:
             return
 
         try:
-            # 2. Initialize Porcupine
+            # 2. Initialize Porcupine with increased sensitivity
             self.porcupine = pvporcupine.create(
                 access_key=self.ACCESS_KEY, 
-                keyword_paths=[keyword_path]
+                keyword_paths=[keyword_path],
+                sensitivities=[1] # Boosted from default 0.5 to catch the word easier
             )
-            self.recorder = PvRecorder(device_index=1, frame_length=self.porcupine.frame_length)
+            
+            # 3. Initialize Recorder using the DEFAULT microphone (index -1)
+            self.recorder = PvRecorder(device_index=0, frame_length=self.porcupine.frame_length)
             self.recorder.start()
             
             print(f">>> [Wake Word] Service Started. Listening for 'Hey Adorix'...")
+            print(f">>> Using default system microphone. Press Ctrl+C to stop.")
             
             while not self.stop_program:
                 if self.recorder and self.porcupine:
                     pcm = self.recorder.read()
+                    
+                    # DEBUGGING: Uncomment the line below if it still isn't working 
+                    # to see if the microphone is actually picking up volume
+                    # print(f"Mic volume level: {max(pcm)}") 
+                    
                     result = self.porcupine.process(pcm)
 
                     if result >= 0:
-                        print("!!! WAKE WORD DETECTED !!!")
+                        print("\n!!! WAKE WORD DETECTED !!!")
                         if self.callback:
                             self.callback()
                         else:
                             print("(No callback defined for wake word)")
-                
-                # Small sleep to prevent high CPU usage if needed, 
-                # but process() is usually blocking/timed.
                 
         except Exception as e:
             print(f"CRITICAL AUDIO ERROR: {e}")
@@ -71,6 +75,7 @@ class WakeWordService:
         if self.porcupine:
             self.porcupine.delete()
             self.porcupine = None
+        print("\n>>> Wake Word Service stopped and cleaned up.")
 
 # For standalone testing
 if __name__ == "__main__":
