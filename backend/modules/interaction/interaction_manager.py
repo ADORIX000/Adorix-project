@@ -43,8 +43,13 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
 
     # --- 1. Initial Greeting ---
     if is_active_callback and not is_active_callback(): return "ABORTED"
+    
+    # Wait for the wakeup animation to finish playing (~2.5 seconds)
+    print(">>> [System] Waiting 2.5s for wakeup animation to complete before greeting...")
+    time.sleep(2.5)
+    
     if state_callback:
-        state_callback(avatar_state="TALK", subtitle="Hello! I'm Adorix. Do you have any questions?")
+        state_callback(avatar_state="talking.webm", subtitle="Hello! I'm Adorix. Do you have any questions?")
         
     speak("Hello! I'm Adorix. I saw you were looking at this ad. Do you have any questions for me?")
     
@@ -52,7 +57,7 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
     while True:
         if is_active_callback and not is_active_callback(): return "ABORTED"
         if state_callback:
-            state_callback(avatar_state="LISTEN", subtitle="I'm listening...")
+            state_callback(avatar_state="listening.webm", subtitle="I'm listening...")
 
         print("\n>>> [System] Listening for user STT input...")
         # STT Engine listens for exactly 7 seconds
@@ -64,14 +69,14 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
         if not user_question:
             print(">>> [System] 7 seconds of continuous silence detected. Ending interaction.")
             if state_callback:
-                state_callback(avatar_state="TALK", subtitle="Have a nice day!")
+                state_callback(avatar_state="talking.webm", subtitle="Have a nice day!")
             speak("Have a nice day! I'll go back to the ads now.")
             return "GOTO_LOOP"
             
         # --- 4. Process Active Speech ---
         print(f">>> [User STT Input] {user_question}")
         if state_callback:
-            state_callback(avatar_state="THINK", subtitle=f"Processing: {user_question}")
+            state_callback(avatar_state="thinking.webm", subtitle=f"Processing: {user_question}")
         
         # --- 5. Generate Hybrid Answer ---
         answer = get_hybrid_answer(user_question, clean_ad_name)
@@ -81,9 +86,9 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
         # --- 6. TTS Output ---
         print(f">>> [System TTS Output] {answer}")
         if state_callback:
-            state_callback(avatar_state="TALK", subtitle=answer)
+            state_callback(avatar_state="talking.webm", subtitle=answer)
         speak(answer)
         
         if is_active_callback and not is_active_callback(): return "ABORTED"
         if state_callback:
-            state_callback(avatar_state="LISTEN", subtitle="Anything else?")
+            state_callback(avatar_state="listening.webm", subtitle="Anything else?")

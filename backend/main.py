@@ -148,7 +148,7 @@ def on_wake_word():
         print("\n>>> [State Machine] Wake Word Detected! Personalized -> Interaction")
         state.system_id = 3
         state.mode = "INTERACTION"
-        state.avatar_state = "WAKE"
+        state.avatar_state = "wakeup.webm"
         state.subtitle = "Yes? I'm listening..."
         current_ad = state.ad_url
         
