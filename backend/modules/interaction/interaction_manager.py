@@ -60,14 +60,14 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
             state_callback(avatar_state="listening.webm", subtitle="I'm listening...")
 
         print("\n>>> [System] Listening for user STT input...")
-        # STT Engine listens for exactly 7 seconds
-        user_question = listen_one_phrase(timeout=7)
+        # STT Engine listens for exactly 10 seconds
+        user_question = listen_one_phrase(timeout=10)
         
         if is_active_callback and not is_active_callback(): return "ABORTED"
         
-        # --- 3. Handle Silence (The 7-second Timeout) -> Transition Back to Loop ---
+        # --- 3. Handle Silence (The 10-second Timeout) -> Transition Back to Loop ---
         if not user_question:
-            print(">>> [System] 7 seconds of continuous silence detected. Ending interaction.")
+            print(">>> [System] 10 seconds of continuous silence detected. Ending interaction.")
             if state_callback:
                 state_callback(avatar_state="talking.webm", subtitle="Have a nice day!")
             speak("Have a nice day! I'll go back to the ads now.")

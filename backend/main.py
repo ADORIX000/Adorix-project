@@ -120,20 +120,7 @@ def on_vision_update(data):
             state.ad_url = ad_url
             sync_broadcast()
             
-        # 3 -> 1: Transition back to Loop Mode (Face Lost)
-        # Note: Personalized(2) ignores Face Lost; it waits for frontend AD_LOOP_TIMEOUT after 2 loops.
-        elif new_id == 1 and current_id == 3:
-            print("\n>>> [State Machine] User Left Frame. Reverting -> Loop Mode")
-            state.system_id = 1
-            state.mode = "IDLE"
-            state.avatar_state = "SLEEP"
-            state.subtitle = ""
-            state.ad_url = ""
-            sync_broadcast()
-            
-            # If we were in interaction mode, the mic was locked for STT. 
-            # We must restart the wake word scanner so the next person can use it.
-            restart_wake_word_service()
+        # DEPRECATED: We now rely on STT 10-second auditory silence timeout!
 
 def on_wake_word():
     """

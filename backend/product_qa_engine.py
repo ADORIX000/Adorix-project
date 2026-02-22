@@ -45,7 +45,8 @@ class ProductQAEngine:
                 if filename.endswith(".json"):
                     filepath = os.path.join(self.ads_dir, filename)
                     with open(filepath, 'r', encoding='utf-8') as f:
-                        self.product_data[filename] = json.load(f)
+                        clean_name = filename.replace(".json", "")
+                        self.product_data[clean_name] = json.load(f)
             print(f"✓ Loaded {len(self.product_data)} products")
         except Exception as e:
             print(f"Error loading products: {e}")
@@ -133,9 +134,6 @@ class ProductQAEngine:
             num_questions: Number of questions to allow (default 3)
             timeout: Listening timeout in seconds
         """
-        if not product_name.endswith('.json'):
-            product_name = product_name + '.json'
-        
         if product_name not in self.product_data:
             from modules.interaction.tts_engine import speak
             speak(f"Sorry, I don't have information about that product.")
@@ -193,9 +191,6 @@ class ProductQAEngine:
         Demo mode: Simulate Q&A without actual listening.
         Useful for testing without microphone.
         """
-        if not product_name.endswith('.json'):
-            product_name = product_name + '.json'
-        
         if product_name not in self.product_data:
             print(f"Error: Product {product_name} not found")
             return False
