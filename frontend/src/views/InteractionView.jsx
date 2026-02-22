@@ -45,7 +45,7 @@ export default function InteractionView({ adUrl, avatarState, setAvatarState }) 
       {/* 3. THE 2D AVATAR OVERLAY */}
       {/* ========================================== */}
       {/* We pass the avatarState down so the Avatar overlay knows which preloaded video to play */}
-      <div className="relative z-50 w-full flex justify-center pb-0">
+      <div className="absolute inset-0 z-50 pointer-events-none">
         <AvatarOverlay avatarState={avatarState} setAvatarState={setAvatarState} />
       </div>
 
