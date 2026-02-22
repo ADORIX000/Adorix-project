@@ -19,8 +19,8 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
   if (avatarState === AVATAR_STATES.HIDDEN || avatarState === 'HIDDEN') return null;
 
   return (
-    <div className="absolute bottom-0 w-full flex justify-center z-50 pointer-events-none">
-      <div className="w-[120%] max-w-[800px]">
+    <div className="absolute inset-0 w-full h-full flex items-center justify-center z-50 pointer-events-none">
+      <div className="w-full h-full">
         
         {/* NON-LOOPING VIDEOS (Trigger handleVideoEnd) */}
         {avatarState === AVATAR_STATES.WAKEUP && (
@@ -28,7 +28,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
             src="/avatar-videos/wakeup.webm" 
             autoPlay muted playsInline 
             onEnded={handleVideoEnd} 
-            className="w-full h-auto drop-shadow-2xl"
+            className="w-full h-full object-cover drop-shadow-2xl"
           />
         )}
 
@@ -37,7 +37,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
             src="/avatar-videos/sleep.webm" 
             autoPlay muted playsInline 
             onEnded={handleVideoEnd} 
-            className="w-full h-auto drop-shadow-2xl"
+            className="w-full h-full object-cover drop-shadow-2xl"
           />
         )}
 
@@ -46,7 +46,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
           <video 
             src="/avatar-videos/listening.webm" 
             autoPlay loop muted playsInline 
-            className="w-full h-auto drop-shadow-2xl"
+            className="w-full h-full object-cover drop-shadow-2xl"
           />
         )}
 
@@ -54,7 +54,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
           <video 
             src="/avatar-videos/thinking.webm" 
             autoPlay loop muted playsInline 
-            className="w-full h-auto drop-shadow-2xl"
+            className="w-full h-full object-cover drop-shadow-2xl"
           />
         )}
 
@@ -62,7 +62,7 @@ export default function AvatarOverlay({ avatarState, setAvatarState }) {
           <video 
             src="/avatar-videos/talking.webm" 
             autoPlay loop muted playsInline 
-            className="w-full h-auto drop-shadow-2xl"
+            className="w-full h-full object-cover drop-shadow-2xl"
           />
         )}
         
