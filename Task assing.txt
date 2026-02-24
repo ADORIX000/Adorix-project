@@ -118,5 +118,10 @@ Task ID,Task Description,Suggested Role
 4.2,"Implement Realtime Subscription: Set up the supabase.channel('notepad').on('INSERT', ...).subscribe() logic to listen for new notes and update the <textarea> in real-time.",Frontend
 4.3,"Implement Debounced Save: Create a debounced function (e.g., using lodash or a custom hook) to update the note in Supabase only after the user stops typing for 500ms.",Frontend
 
+------------------------------------------------------------------------------------------------
 
+Testing & Polish
 
+Task ID,Task Description,Suggested Role
+5.1,"Test Concurrency: Have two team members open the app and type simultaneously to verify that the Realtime subscription correctly merges changes.",All
+5.2,"Final Review: Check that the UI is clean, the connection is stable, and the project is ready to be deployed.",Team Lead
