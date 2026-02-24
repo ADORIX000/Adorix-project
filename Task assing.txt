@@ -85,3 +85,19 @@ Sithika
 Chanithama
 
 enter the code to the three files that in component(find it in the chat)
+
+------------------------------------------------------------------------------------------------
+
+Environment & Setup
+
+Task ID,Task Description,Suggested Role
+1.1,"Initialize Next.js Repository: Create the Next.js app, push it to a shared GitHub repository, and ensure all team members can clone and run it locally.",Team Lead / Frontend
+1.2,Install Dependencies: Install @supabase/supabase-js and configure the .env.local file template (leave keys blank in the repo for security).,Frontend
+
+Backend (Supabase Configuration)
+Task ID,Task Description,Suggested Role
+2.1,"Create Project & Table: Create the Supabase project, execute the SQL script to create the notes table, and insert the first default row.",Backend
+2.2,Enable Realtime: Run the SQL command (ALTER PUBLICATION...) to ensure the notes table broadcasts changes.,Backend
+2.3,Distribute API Keys: Retrieve the Project URL and anon key from Supabase and securely share them with the team to put in their local .env files.,Backend
+
+
