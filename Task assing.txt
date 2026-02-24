@@ -101,3 +101,7 @@ Task ID,Task Description,Suggested Role
 2.3,Distribute API Keys: Retrieve the Project URL and anon key from Supabase and securely share them with the team to put in their local .env files.,Backend
 
 
+Frontend UI & Connection
+Task ID,Task Description,Suggested Role
+3.1,Create Supabase Client: Create the supabaseClient.js file to initialize and export the Supabase connection using the environment variables.,Frontend
+3.2,"Build the Notepad UI: Create the main page layout featuring a full-screen or centered <textarea>, a header, and basic styling.",Frontend
