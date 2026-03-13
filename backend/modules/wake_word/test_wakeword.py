@@ -71,8 +71,10 @@ def run_diagnostic():
             sample_rate=16000,
             feature_dim=80,
             max_active_paths=4,
+            keywords_score=2.0,      # Boosted
+            keywords_threshold=0.2,  # Sensitive
         )
-        print("  [OK] Sherpa-ONNX engine initialized successfully!")
+        print("  [OK] Sherpa-ONNX engine initialized (Sensitivity Boosted).")
     except Exception as e:
         print(f"  [FAIL] Engine initialization error: {e}")
         return
