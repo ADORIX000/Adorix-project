@@ -1,87 +1,125 @@
-import pvporcupine
-from pvrecorder import PvRecorder
+try:
+    import sherpa_onnx
+except ImportError:
+    sherpa_onnx = None
+    print("!!! [Wake Word] WARNING: sherpa_onnx not installed in this environment.")
+    print("!!! Run: pip install sherpa-onnx sentencepiece numpy")
+import numpy as np
 import os
+try:
+    from pvrecorder import PvRecorder
+except ImportError:
+    PvRecorder = None
+try:
+    import sounddevice as sd
+except ImportError:
+    sd = None
 
 class WakeWordService:
     def __init__(self, callback_function=None):
-        """
-        Initializes the Porcupine wake word engine.
-        :param callback_function: Function to call when the wake word is detected.
-        """
-        # --- CONFIGURATION (User provided) ---
-        self.ACCESS_KEY = "Mq/t/eYybihg3oyZrgu8SIv4jujAh7KeELbD7EepxuQjl4R31pdvmA==" 
-        self.WAKE_WORD_FILENAME = "Hey-Add-Oh-Ricks_en_windows_v4_0_0.ppn"
-        
         self.callback = callback_function
         self.stop_program = False
-        self.porcupine = None
         self.recorder = None
+        self.use_fallback = False
+        self.spotter = None
+
+        if sherpa_onnx is None:
+            print("!!! [Wake Word] sherpa_onnx not available. Wake word disabled.")
+            return
+        
+        # Setup paths
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        model_dir = os.path.join(base_dir, "models", "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01")
+        
+        try:
+            # Initialize Sherpa-ONNX KeywordSpotter directly with paths
+            self.spotter = sherpa_onnx.KeywordSpotter(
+                tokens=os.path.join(model_dir, "tokens.txt"),
+                encoder=os.path.join(model_dir, "encoder-epoch-12-avg-2-chunk-16-left-64.onnx"),
+                decoder=os.path.join(model_dir, "decoder-epoch-12-avg-2-chunk-16-left-64.onnx"),
+                joiner=os.path.join(model_dir, "joiner-epoch-12-avg-2-chunk-16-left-64.onnx"),
+                keywords_file=os.path.join(base_dir, "models", "keywords.txt"),
+                num_threads=2,
+                sample_rate=16000,
+                feature_dim=80,
+                max_active_paths=4,
+                keywords_score=2.0,     # Boosted for easier detection
+                keywords_threshold=0.2, # Lowered threshold (0.25 -> 0.2)
+            )
+            print(">>> [Wake Word] Sherpa-ONNX engine initialized (Sensitivity Boosted).")
+        except Exception as e:
+            print(f"CRITICAL ERROR: Failed to initialize Sherpa-ONNX: {e}")
+            self.spotter = None
 
     def start(self):
-        """Starts listening for the wake word in a loop."""
-        # 1. Setup Path to Wake Word File
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        keyword_path = os.path.join(base_dir, self.WAKE_WORD_FILENAME)
-
-        if not os.path.exists(keyword_path):
-            print(f"\nCRITICAL ERROR: Wake word file not found!")
-            print(f"Looking for: {keyword_path}")
-            return
+        if not self.spotter: return
 
         try:
-            # 2. Initialize Porcupine with increased sensitivity
-            self.porcupine = pvporcupine.create(
-                access_key=self.ACCESS_KEY, 
-                keyword_paths=[keyword_path],
-                sensitivities=[1] # Boosted from default 0.5 to catch the word easier
-            )
-            
-            # 3. Initialize Recorder using the DEFAULT microphone (index -1)
-            self.recorder = PvRecorder(device_index=2, frame_length=self.porcupine.frame_length)
-            self.recorder.start()
-            
-            print(f">>> [Wake Word] Service Started. Listening for 'Hey Adorix'...")
-            print(f">>> Using default system microphone. Press Ctrl+C to stop.")
-            
-            while not self.stop_program:
-                if self.recorder and self.porcupine:
-                    pcm = self.recorder.read()
-                    
-                    # DEBUGGING: Uncomment the line below if it still isn't working 
-                    # to see if the microphone is actually picking up volume
-                    # print(f"Mic volume level: {max(pcm)}") 
-                    
-                    result = self.porcupine.process(pcm)
+            # Initialize Recorder
+            try:
+                if PvRecorder:
+                    self.recorder = PvRecorder(device_index=-1, frame_length=512)
+                    self.recorder.start()
+                    print(">>> [Wake Word] Recording started (PvRecorder)")
+                else:
+                    raise ImportError("PvRecorder not found")
+            except Exception as e:
+                print(f">>> [Wake Word] PvRecorder failed: {e}. Falling back to sounddevice.")
+                if sd:
+                    self.use_fallback = True
+                    print(">>> [Wake Word] Recording started (sounddevice fallback)")
+                else:
+                    raise Exception("No recording library available (PvRecorder/sounddevice).")
 
-                    if result >= 0:
-                        print("\n!!! WAKE WORD DETECTED !!!")
-                        if self.callback:
-                            self.callback()
-                        else:
-                            print("(No callback defined for wake word)")
-                
+            print(">>> [Wake Word] Listening for 'Hey Adorix'...")
+
+            # Sherpa-ONNX stream
+            stream = self.spotter.create_stream()
+
+            while not self.stop_program:
+                try:
+                    if self.use_fallback:
+                        # sounddevice uses blocking rec
+                        samples = sd.rec(1024, samplerate=16000, channels=1, dtype='float32')
+                        sd.wait()
+                        samples = samples.flatten()
+                    else:
+                        pcm = self.recorder.read()
+                        samples = np.array(pcm, dtype=np.float32) / 32768.0
+
+                    stream.accept_waveform(16000, samples)
+                    while self.spotter.is_ready(stream):
+                        self.spotter.decode_stream(stream)
+                    
+                    keyword = self.spotter.get_result(stream)
+                    if keyword:
+                        print(f"\n!!! WAKE WORD DETECTED: {keyword} !!!")
+                        if self.callback: self.callback()
+                        # Reset stream after detection to avoid double triggers
+                        self.spotter.reset_stream(stream)
+                except Exception as loop_e:
+                    print(f"!!! [Wake Word Loop Error] {loop_e}")
+                    import time
+                    time.sleep(0.1)
+
         except Exception as e:
-            print(f"CRITICAL AUDIO ERROR: {e}")
+            print(f"CRITICAL WAKE WORD ERROR: {e}")
         finally:
             self.stop()
 
     def stop(self):
-        """Stops the recorder and cleans up resources."""
         self.stop_program = True
         if self.recorder:
-            self.recorder.stop()
-            self.recorder.delete()
+            try:
+                self.recorder.stop()
+                self.recorder.delete()
+            except: pass
             self.recorder = None
-        if self.porcupine:
-            self.porcupine.delete()
-            self.porcupine = None
         print("\n>>> Wake Word Service stopped and cleaned up.")
 
-# For standalone testing
 if __name__ == "__main__":
     def test_callback():
-        print("Test Callback: I heard the wake word!")
-
+        print("Heard the wake word!")
     service = WakeWordService(callback_function=test_callback)
     try:
         service.start()
