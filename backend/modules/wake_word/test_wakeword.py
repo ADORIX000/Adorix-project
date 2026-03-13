@@ -53,9 +53,10 @@ def run_diagnostic():
         for i, device in enumerate(devices):
             print(f"  [{i}]: {device}")
         
-        # We will use the default device (index 0)
-        device_index = 2
-        print(f"[OK] Will attempt to use device [{device_index}]: {devices[device_index]}")
+        # We will use the default device (index -1)
+        device_index = -1
+        actual_name = devices[0] if devices else "Default"
+        print(f"[OK] Will attempt to use default device index -1.")
     except Exception as e:
         print(f"[ERROR] Error getting audio devices: {e}")
         return
@@ -78,9 +79,31 @@ def run_diagnostic():
     # 5. Microphone testing and Listening
     print("\n[5/5] Testing Microphone and Listening...")
     try:
-        recorder = PvRecorder(device_index=device_index, frame_length=porcupine.frame_length)
-        recorder.start()
-        print("[OK] Audio recorder started successfully.")
+        # Auto-device selection logic
+        devices = PvRecorder.get_available_devices()
+        recorder = None
+        
+        # Try default first (-1)
+        try:
+            recorder = PvRecorder(device_index=-1, frame_length=porcupine.frame_length)
+            recorder.start()
+            print("[OK] Audio recorder started successfully using default device (-1).")
+        except:
+            print("[INFO] Default mic failed, searching for alternative...")
+            
+        # If default fails, try every available index
+        if not recorder:
+            for i in range(len(devices)):
+                try:
+                    recorder = PvRecorder(device_index=i, frame_length=porcupine.frame_length)
+                    recorder.start()
+                    print(f"[OK] Audio recorder started successfully using device [{i}]: {devices[i]}")
+                    break
+                except:
+                    continue
+        
+        if not recorder:
+            raise Exception("Could not initialize PvRecorder with any available device.")
         
         print("\n" + "="*50)
         print("[INFO] DIAGNOSTIC LISTENING STARTED")

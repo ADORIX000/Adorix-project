@@ -88,21 +88,25 @@ class AdorixVision:
             for i in range(detections.shape[2]):
                 confidence = detections[0, 0, i, 2]
                 if confidence > 0.5:
-                    x1 = detections[0, 0, i, 3] * w
-                    y1 = detections[0, 0, i, 4] * h
-                    x2 = detections[0, 0, i, 5] * w
-                    y2 = detections[0, 0, i, 6] * h
+                    # Scale coordinates and check for validity
+                    raw_x1 = detections[0, 0, i, 3] * w
+                    raw_y1 = detections[0, 0, i, 4] * h
+                    raw_x2 = detections[0, 0, i, 5] * w
+                    raw_y2 = detections[0, 0, i, 6] * h
 
-                    if not (np.isfinite(x1) and np.isfinite(y1) and np.isfinite(x2) and np.isfinite(y2)):
-                        # print(f"[WARN] Infinite bbox coords: {x1}, {y1}, {x2}, {y2}")
+                    # Guard against non-finite values (NaN/Inf) which cause overflow errors
+                    if not all(np.isfinite([raw_x1, raw_y1, raw_x2, raw_y2])):
                         continue
                     
-                    x1 = int(x1)
-                    y1 = int(y1)
-                    x2 = int(x2)
-                    y2 = int(y2)
+                    # Convert to integers and clip to frame boundaries
+                    x1 = int(np.clip(raw_x1, 0, w - 1))
+                    y1 = int(np.clip(raw_y1, 0, h - 1))
+                    x2 = int(np.clip(raw_x2, 0, w - 1))
+                    y2 = int(np.clip(raw_y2, 0, h - 1))
                     
-                    bboxes.append((max(0, x1), max(0, y1), min(w, x2), min(h, y2)))
+                    # Ensure valid box dimensions
+                    if x2 > x1 and y2 > y1:
+                        bboxes.append((x1, y1, x2, y2))
         except Exception as e:
             print(f"[ERROR] Logic error in detect_faces: {e}")
         return bboxes
