@@ -1,6 +1,0 @@
---- AVAILABLE AUDIO DEVICES ---
-Index [0]: Microphone Array (2- Intel® Smart Sound Technology for Digital Microphones)
-Index [1]: Microphone (C922 Pro Stream Webcam)
-Index [2]: Microphone (OMEN Cam & Voice)
-Index [3]: Microphone (3- USB PnP Sound Device)
--------------------------------
