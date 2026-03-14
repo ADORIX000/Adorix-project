@@ -52,7 +52,7 @@ class AdSelector:
         if not primary:
             return self.rules.get("DEFAULT", "generic_ad.mp4")
 
-        key = f"{primary.get('gender')}_{primary.get('age')}"
+        key = f"{primary.get('age')}_{primary.get('gender')}"
         return self.rules.get(key, self.rules.get("DEFAULT", "generic_ad.mp4"))
 
     def get_personalized_ad(self, demographic_key: str) -> str:
