@@ -17,7 +17,7 @@ def mock_broadcast(data):
         ad = data.get("ad_url", "N/A")
         
         print("\n" + "="*50)
-        print("🎯 FINAL ANALYSIS WINNER (2-Second Window)")
+        print(" FINAL ANALYSIS WINNER (2-Second Window)")
         
         for demo in demo_list:
             # Parse "16-29_male" -> "16-29" and "male"
@@ -25,9 +25,9 @@ def mock_broadcast(data):
             age = parts[0] if len(parts) > 0 else "Unknown"
             gender = parts[1].capitalize() if len(parts) > 1 else "Unknown"
             
-            print(f"👤 Detected: {gender}")
-            print(f"🎂 Age Group: {age}")
-            print(f"🎬 Assigned Ad: {ad}")
+            print(f"Detected: {gender}")
+            print(f"Age Group: {age}")
+            print(f"Assigned Ad: {ad}")
             
         print("="*50 + "\n")
 
