@@ -50,17 +50,26 @@ def run_test():
 
     # 3. Test Demographic Mapping (get_personalized_ad)
     print("\n[2/4] Testing Demographic Mapping (get_personalized_ad)...")
-    test_cases = [
-        "10-15_male",
-        "16-29_female",
-        "30-39_male",
-        "above-60_female",
-        "invalid_key", # Should fallback
-        None           # Should fallback
+    
+    # Load all keys from rules.json to test everything
+    with open(rules_path, "r", encoding="utf-8") as f:
+        rules_data = json.load(f)
+    
+    # Filter for actual demographic mappings (Value should be a string, usually .mp4)
+    demographic_keys = [
+        k for k, v in rules_data.items() 
+        if isinstance(v, str) and v.endswith(".mp4") and k not in ["IDLE", "DEFAULT"]
     ]
+    
+    test_cases = demographic_keys + ["invalid_key", None]
     
     for key in test_cases:
         ad = selector.get_personalized_ad(key)
+        # Handle cases where get_personalized_ad returns a non-string (shouldn't happen with valid rules)
+        if not isinstance(ad, str):
+            print(f"  Input: {str(key):15} -> [ERROR] Result is {type(ad).__name__}: {ad}")
+            continue
+            
         exists = os.path.exists(os.path.join(ads_dir, ad))
         status = "[OK]" if exists else "[WARN - File Missing]"
         print(f"  Input: {str(key):15} -> Result: {ad:20} {status}")
