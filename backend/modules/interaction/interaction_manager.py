@@ -60,8 +60,8 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
             state_callback(avatar_state="listening.webm", subtitle="I'm listening...")
 
         print("\n>>> [System] Listening for user STT input...")
-        # STT Engine listens for exactly 10 seconds
-        user_question = listen_one_phrase(timeout=10)
+        # STT Engine listens for exactly 7 seconds
+        user_question = listen_one_phrase(timeout=7)
         
         if is_active_callback and not is_active_callback(): return "ABORTED"
         
