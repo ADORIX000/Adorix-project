@@ -7,7 +7,29 @@ from vision_service import AdorixVision
 
 # Mock callback to print broadcast messages
 def mock_broadcast(data):
-    print(f"\n[BROADCAST] Data received: {data}")
+    sid = data.get("system_id")
+    if sid == 1:
+        # Loop Mode - optionally silent or just a dot
+        sys.stdout.write(".")
+        sys.stdout.flush()
+    elif sid == 2:
+        demo_list = data.get("demographics", [])
+        ad = data.get("ad_url", "N/A")
+        
+        print("\n" + "="*50)
+        print(" FINAL ANALYSIS WINNER (2-Second Window)")
+        
+        for demo in demo_list:
+            # Parse "16-29_male" -> "16-29" and "male"
+            parts = demo.split("_")
+            age = parts[0] if len(parts) > 0 else "Unknown"
+            gender = parts[1].capitalize() if len(parts) > 1 else "Unknown"
+            
+            print(f"Detected: {gender}")
+            print(f"Age Group: {age}")
+            print(f"Assigned Ad: {ad}")
+            
+        print("="*50 + "\n")
 
 def run_test():
     print("--------------------------------------------------")

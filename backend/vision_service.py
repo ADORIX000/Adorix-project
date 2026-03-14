@@ -136,6 +136,10 @@ class AdorixVision:
                         demographics_list.append(mapped)
                 
                 if demographics_list:
+                    # Log real-time detections for console visibility
+                    for d in demographics_list:
+                        print(f"[VISION-LIVE] Detecting: {d}")
+                        
                     # Strip duplicates from THIS specific frame and add to the global list
                     unique_in_frame = list(set(demographics_list))
                     self.detection_buffer.extend(unique_in_frame)
