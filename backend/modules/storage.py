@@ -64,12 +64,12 @@ def sync_ads():
     # 1. Fetch active ads (filenames and IDs) from Supabase
     try:
         print("🔍 Fetching active ads from database...")
-        # We select both video_filename and id (UUID)
-        response = supabase.table("ads").select("id, video_filename").eq("status", "active").execute()
+        # We select both video_filename and ad_id (UUID)
+        response = supabase.table("ads").select("ad_id, video_filename").eq("status", "active").execute()
         
         active_filenames = {item['video_filename'] for item in response.data if item.get('video_filename')}
-        # Create mapping of filename -> id
-        mapping = {item['video_filename']: item['id'] for item in response.data if item.get('video_filename')}
+        # Create mapping of filename -> ad_id
+        mapping = {item['video_filename']: item['ad_id'] for item in response.data if item.get('video_filename')}
         
         print(f"📋 Found {len(active_filenames)} active ad(s) in database.")
         
