@@ -182,6 +182,18 @@ def handle_interaction(ad_url):
                 # Restart the wake word service for the next cycle
                 restart_wake_word_service()
 
+# --- Background Tasks ---
+async def periodic_sync_task():
+    """Background task to ensure ads are synced every 10 minutes as a fallback."""
+    from modules.storage import sync_ads
+    while True:
+        try:
+            # Shift to a thread if sync_ads is not async
+            await asyncio.to_thread(sync_ads)
+        except Exception as e:
+            print(f"!!! [System] Periodic sync failed: {e}")
+        await asyncio.sleep(600)  # 10 minutes
+
 # --- Server Lifecycle Integration ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -222,6 +234,9 @@ async def lifespan(app: FastAPI):
         ).subscribe()
     except Exception as e:
         print(f"!!! [System] Failed to start Realtime listener: {e}")
+
+    # 4. Start periodic fallback sync
+    asyncio.create_task(periodic_sync_task())
 
     yield
     

@@ -34,10 +34,10 @@ class AdSessionTracker:
         
         # Prepare reporting payload
         event_data = {
-            "ad_id": self.ad_filename,
-            "viewer_age_group": self.viewer_data.get("age", "Unknown"),
-            "viewer_gender": self.viewer_data.get("gender", "Unknown"),
-            "watch_time": round(duration, 2),
+            "filename": self.ad_filename,
+            "age": self.viewer_data.get("age", "Unknown"),
+            "gender": self.viewer_data.get("gender", "Unknown"),
+            "duration": round(duration, 2),
             "engaged": self.engaged
         }
 
