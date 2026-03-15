@@ -18,6 +18,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fil
 # Local ads directory path (backend/ads)
 LOCAL_ADS_DIR = os.path.join(ROOT_DIR, "backend", "ads")
 MANIFEST_FILE = os.path.join(LOCAL_ADS_DIR, "sync_manifest.json")
+MAPPING_FILE = os.path.join(LOCAL_ADS_DIR, "mapping.json")
 
 # Specific bucket URL for downloading media
 PROJECT_ID = URL.split("//")[1].split(".")[0] if URL else "jnvadpuejjoakivfjcue"
@@ -60,12 +61,23 @@ def sync_ads():
     manifest = load_manifest()
     new_manifest = {}
 
-    # 1. Fetch active video_filenames from Supabase 'ads' table
+    # 1. Fetch active ads (filenames and IDs) from Supabase
     try:
         print("🔍 Fetching active ads from database...")
-        response = supabase.table("ads").select("video_filename").eq("status", "active").execute()
+        # We select both video_filename and id (UUID)
+        response = supabase.table("ads").select("id, video_filename").eq("status", "active").execute()
+        
         active_filenames = {item['video_filename'] for item in response.data if item.get('video_filename')}
+        # Create mapping of filename -> id
+        mapping = {item['video_filename']: item['id'] for item in response.data if item.get('video_filename')}
+        
         print(f"📋 Found {len(active_filenames)} active ad(s) in database.")
+        
+        # Save mapping.json
+        with open(MAPPING_FILE, "w") as f:
+            json.dump(mapping, f, indent=4)
+        print(f"📄 Mapping updated: {MAPPING_FILE}")
+        
     except Exception as e:
         print(f"❌ Error fetching ads from database: {e}")
         return

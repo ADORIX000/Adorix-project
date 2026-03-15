@@ -20,7 +20,7 @@ from backend.modules.wake_word.wakeword import WakeWordService
 from backend.modules.interaction import listen_one_phrase, speak
 from backend.modules.interaction.brain_engine import adorix_brain
 from backend.modules.storage import sync_ads
-from backend.modules.analytics import report_ad_event
+from backend.modules.analytics import report_ad_play
 from backend.modules.tracker import AdSessionTracker
 
 # ============ CONFIG ============
@@ -259,7 +259,7 @@ def main_loop():
                     # Transition to Personalized: Stop IDLE session, start PERSONALIZED session
                     old_event = ad_tracker.stop()
                     if old_event:
-                        report_ad_event(**old_event)
+                        report_ad_play(**old_event)
 
                     print(">>> [State] LOOP -> PERSONALIZED")
                     kiosk.mode = "PERSONALIZED"
@@ -285,7 +285,7 @@ def main_loop():
                         # Transition back to LOOP: Stop PERSONALIZED session
                         event = ad_tracker.stop()
                         if event:
-                            report_ad_event(**event)
+                            report_ad_play(**event)
 
                         print(">>> [State] PERSONALIZED -> LOOP")
                         kiosk.mode = "LOOP"
