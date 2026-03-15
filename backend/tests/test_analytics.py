@@ -8,7 +8,7 @@ project_root = os.path.dirname(os.path.dirname(current_dir))
 if project_root not in sys.path:
     sys.path.append(project_root)
 
-from backend.modules.analytics import report_ad_event
+from backend.modules.analytics import report_ad_play
 from backend.modules.tracker import AdSessionTracker
 
 def test_tracker_logic():
@@ -35,17 +35,14 @@ def test_tracker_logic():
     print("✅ Tracker Logic: OK")
     return event
 
-def test_supabase_reporting(event_data):
-    print("\n🧪 Testing Supabase Reporting...")
-    print("Note: This requires 'analytics_events' table to exist in your Supabase.")
-    
-    # We rename the keys to match the report_ad_event function arguments
+    # We use report_ad_play which handles UUID resolution from mapping.json
     try:
-        report_ad_event(
-            ad_id=event_data['ad_id'],
-            viewer_age_group=event_data['viewer_age_group'],
-            viewer_gender=event_data['viewer_gender'],
-            watch_time=event_data['watch_time'],
+        from backend.modules.analytics import report_ad_play
+        report_ad_play(
+            filename=event_data['filename'],
+            age=event_data['age'],
+            gender=event_data['gender'],
+            duration=event_data['duration'],
             engaged=event_data['engaged']
         )
         print("🚀 Reporting triggered in background. Check your Supabase console for a new row in 'analytics_events'.")

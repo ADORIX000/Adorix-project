@@ -15,7 +15,7 @@ class AdorixVision:
         # --- NEW: AD SELECTOR INITIALIZATION ---
         current_dir = os.path.dirname(os.path.abspath(__file__))
         rules_path = os.path.join(current_dir, "modules", "ad_engine", "rules.json")
-        ads_dir = os.path.abspath(os.path.join(current_dir, "..", "frontend", "public", "ads"))
+        ads_dir = os.path.abspath(os.path.join(current_dir, "ads"))
         self.selector = AdSelector(rules_path, ads_dir)
         
         # --- NEW: BUFFER STATE VARIABLES ---

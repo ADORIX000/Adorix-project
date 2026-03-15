@@ -49,7 +49,7 @@ def sync_ads():
     """
     Synchronizes ads from Supabase storage to local filesystem.
     - Uses a manifest to track versions and handle updates of existing files.
-    - Unified path: frontend/public/ads
+    - Unified path: backend/ads
     """
     print("🔄 Starting Optimized Ad Sync...")
     
