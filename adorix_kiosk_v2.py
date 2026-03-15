@@ -14,18 +14,18 @@ import numpy as np
 from typing import Set
 
 # --- Services ---
-from services.vision.detector import AgeGenderDetector
-from services.ad_engine.selector import AdSelector
-from services.avatar_interaction.wakeword import WakeWordService
-from services.avatar_interaction.stt import listen_one_phrase
-from services.avatar_interaction.tts import speak
-from services.avatar_interaction.brain import adorix_brain
+from backend.modules.vision.detector import AgeGenderDetector
+from backend.modules.ad_engine.selector import AdSelector
+from backend.modules.wake_word.wakeword import WakeWordService
+from backend.modules.interaction import listen_one_phrase, speak
+from backend.modules.interaction.brain_engine import adorix_brain
+from backend.modules.storage import sync_ads
 
 # ============ CONFIG ============
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-RULES_PATH = os.path.join(PROJECT_ROOT, "services", "ad_engine", "rules.json")
-ADS_DIR = os.path.join(PROJECT_ROOT, "services", "ad_engine", "ads")
-DATA_DIR = os.path.join(PROJECT_ROOT, "services", "ad_engine", "data")
+RULES_PATH = os.path.join(PROJECT_ROOT, "backend", "modules", "ad_engine", "rules.json")
+ADS_DIR = os.path.join(PROJECT_ROOT, "frontend", "public", "ads")
+DATA_DIR = os.path.join(PROJECT_ROOT, "backend", "modules", "ad_engine", "data")
 
 # ============ GLOBAL STATE ============
 class KioskState:
@@ -136,6 +136,43 @@ async def websocket_server():
 
     import uvicorn
     server = uvicorn.Server(uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="critical"))
+    
+    @app.on_event("startup")
+    async def startup_event():
+        # 1. Start Periodic Poll (Fallback)
+        async def run_sync_periodically():
+            await asyncio.sleep(5) # Brief delay before first sync
+            while True:
+                print("⏲️ Periodic Ad Sync triggered...")
+                try:
+                    await asyncio.get_event_loop().run_in_executor(None, sync_ads)
+                except Exception as e:
+                    print(f"❌ Periodic Sync Error: {e}")
+                await asyncio.sleep(600)  # 10 minutes
+        
+        asyncio.create_task(run_sync_periodically())
+        print("✅ Background Ad Sync Task Scheduled (Every 10m)")
+
+        # 2. Start Realtime Listener (Instant Update)
+        try:
+            from backend.modules.storage import supabase
+            
+            def handle_realtime_change(payload):
+                print(f"⚡ [Realtime] Ad change detected ({payload.get('eventType')})! Triggering sync...")
+                # Run sync in executor because it's synchronous
+                loop.run_in_executor(None, sync_ads)
+
+            print("📡 Connecting to Supabase Realtime for 'ads' table...")
+            supabase.channel("ads_sync_channel").on_postgres_changes(
+                event="*",
+                schema="public",
+                table="ads",
+                callback=handle_realtime_change
+            ).subscribe()
+            print("✅ Supabase Realtime Listener Active")
+        except Exception as e:
+            print(f"⚠️ Could not start Realtime listener: {e}. Falling back to 10m polling only.")
+
     await server.serve()
 
 def start_websocket_thread():
