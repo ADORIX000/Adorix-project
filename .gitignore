@@ -46,3 +46,6 @@ venv/
 .env
 .env.*
 !.env.example
+
+# Adorix Specific - Sync Assets
+backend/ads/*.mp4
