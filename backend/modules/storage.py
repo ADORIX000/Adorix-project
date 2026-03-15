@@ -134,8 +134,8 @@ def sync_ads():
     try:
         local_files = os.listdir(LOCAL_ADS_DIR)
         for local_file in local_files:
-            # Don't delete the manifest file
-            if local_file == "sync_manifest.json":
+            # Don't delete metadata files
+            if local_file in ["sync_manifest.json", "mapping.json"]:
                 continue
             
             if local_file not in active_filenames:
