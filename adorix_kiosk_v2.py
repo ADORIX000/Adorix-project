@@ -139,18 +139,39 @@ async def websocket_server():
     
     @app.on_event("startup")
     async def startup_event():
+        # 1. Start Periodic Poll (Fallback)
         async def run_sync_periodically():
+            await asyncio.sleep(5) # Brief delay before first sync
             while True:
-                print("⏲️ Background Ad Sync triggered...")
+                print("⏲️ Periodic Ad Sync triggered...")
                 try:
-                    # Run in thread pool since sync_ads is synchronous
                     await asyncio.get_event_loop().run_in_executor(None, sync_ads)
                 except Exception as e:
-                    print(f"❌ Background Sync Error: {e}")
-                await asyncio.sleep(600)  # 10 minutes (600 seconds)
+                    print(f"❌ Periodic Sync Error: {e}")
+                await asyncio.sleep(600)  # 10 minutes
         
         asyncio.create_task(run_sync_periodically())
         print("✅ Background Ad Sync Task Scheduled (Every 10m)")
+
+        # 2. Start Realtime Listener (Instant Update)
+        try:
+            from backend.modules.storage import supabase
+            
+            def handle_realtime_change(payload):
+                print(f"⚡ [Realtime] Ad change detected ({payload.get('eventType')})! Triggering sync...")
+                # Run sync in executor because it's synchronous
+                loop.run_in_executor(None, sync_ads)
+
+            print("📡 Connecting to Supabase Realtime for 'ads' table...")
+            supabase.channel("ads_sync_channel").on_postgres_changes(
+                event="*",
+                schema="public",
+                table="ads",
+                callback=handle_realtime_change
+            ).subscribe()
+            print("✅ Supabase Realtime Listener Active")
+        except Exception as e:
+            print(f"⚠️ Could not start Realtime listener: {e}. Falling back to 10m polling only.")
 
     await server.serve()
 
