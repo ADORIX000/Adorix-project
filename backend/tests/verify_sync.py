@@ -22,7 +22,7 @@ def verify_system():
 
     # 2. Check Directory Structure
     root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    ads_dir = os.path.join(root_dir, "frontend", "public", "ads")
+    ads_dir = os.path.join(root_dir, "backend", "ads")
     manifest_path = os.path.join(ads_dir, "sync_manifest.json")
     
     print(f"📁 [DIR] Local Ads Target: {ads_dir}")

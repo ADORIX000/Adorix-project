@@ -48,5 +48,5 @@ venv/
 !.env.example
 
 # Adorix Specific - Sync Assets
-frontend/public/ads/*.mp4
-frontend/public/ads/sync_manifest.json
+backend/ads/*.mp4
+backend/ads/sync_manifest.json
