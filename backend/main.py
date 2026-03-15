@@ -200,6 +200,29 @@ async def lifespan(app: FastAPI):
     vision_service = AdorixVision(broadcast_callback=on_vision_update)
     threading.Thread(target=vision_service.start, daemon=True).start()
     
+    # 3. Start Ad Synchronization & Realtime Listener
+    from modules.storage import sync_ads, supabase
+    
+    # Initial sync
+    print(">>> [System] Performing initial ad synchronization...")
+    threading.Thread(target=sync_ads, daemon=True).start()
+
+    def handle_ad_change(payload):
+        print(f"\n⚡ [Realtime] Ad change detected: {payload.get('eventType')}")
+        # Trigger sync immediately
+        threading.Thread(target=sync_ads, daemon=True).start()
+
+    try:
+        print(">>> [System] Starting Supabase Realtime Listener for ads...")
+        supabase.channel("ads_sync").on_postgres_changes(
+            event="*",
+            schema="public",
+            table="ads",
+            callback=handle_ad_change
+        ).subscribe()
+    except Exception as e:
+        print(f"!!! [System] Failed to start Realtime listener: {e}")
+
     yield
     
     # Cleanup on shutdown

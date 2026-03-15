@@ -15,8 +15,8 @@ KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
 # Root directory: storage.py is in backend/modules/
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Unified local ads directory path (frontend/public/ads)
-LOCAL_ADS_DIR = os.path.join(ROOT_DIR, "frontend", "public", "ads")
+# Local ads directory path (backend/ads)
+LOCAL_ADS_DIR = os.path.join(ROOT_DIR, "backend", "ads")
 MANIFEST_FILE = os.path.join(LOCAL_ADS_DIR, "sync_manifest.json")
 
 # Specific bucket URL for downloading media

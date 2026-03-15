@@ -20,11 +20,13 @@ from backend.modules.wake_word.wakeword import WakeWordService
 from backend.modules.interaction import listen_one_phrase, speak
 from backend.modules.interaction.brain_engine import adorix_brain
 from backend.modules.storage import sync_ads
+from backend.modules.analytics import report_ad_event
+from backend.modules.tracker import AdSessionTracker
 
 # ============ CONFIG ============
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 RULES_PATH = os.path.join(PROJECT_ROOT, "backend", "modules", "ad_engine", "rules.json")
-ADS_DIR = os.path.join(PROJECT_ROOT, "frontend", "public", "ads")
+ADS_DIR = os.path.join(PROJECT_ROOT, "backend", "ads")
 DATA_DIR = os.path.join(PROJECT_ROOT, "backend", "modules", "ad_engine", "data")
 
 # ============ GLOBAL STATE ============
@@ -236,6 +238,7 @@ def main_loop():
     WIN_NAME = "ADORIX KIOSK"
     cv2.namedWindow(WIN_NAME, cv2.WINDOW_NORMAL)
     player = VideoPlayer(WIN_NAME)
+    ad_tracker = AdSessionTracker()
     
     last_user_ts = 0
     kiosk.mode = "LOOP"
@@ -253,22 +256,37 @@ def main_loop():
             # --- State Machine ---
             if kiosk.mode == "LOOP":
                 if users:
+                    # Transition to Personalized: Stop IDLE session, start PERSONALIZED session
+                    old_event = ad_tracker.stop()
+                    if old_event:
+                        report_ad_event(**old_event)
+
                     print(">>> [State] LOOP -> PERSONALIZED")
                     kiosk.mode = "PERSONALIZED"
                     last_user_ts = now_ts
                     ad = selector.choose_ad_filename({"primary": users[0], "status": "ACTIVE"})
+                    
                     kiosk.current_ad = ad
                     player.play(ad)
+                    ad_tracker.start(ad, users[0]) # Start tracking new personalized ad
+
                     sync_broadcast({"action": "MODE_SWITCH", "mode": "PERSONALIZED", "ad": ad})
                     wake_word_service.resume()
                 else:
                     if not kiosk.current_ad:
+                        # Start IDLE ad
                         kiosk.current_ad = selector.choose_ad_filename({"status": "IDLE"})
                         player.play(kiosk.current_ad)
+                        ad_tracker.start(kiosk.current_ad) # Start tracking idle loop
             
             elif kiosk.mode == "PERSONALIZED":
                 if not users:
                     if now_ts - last_user_ts > 5.0:
+                        # Transition back to LOOP: Stop PERSONALIZED session
+                        event = ad_tracker.stop()
+                        if event:
+                            report_ad_event(**event)
+
                         print(">>> [State] PERSONALIZED -> LOOP")
                         kiosk.mode = "LOOP"
                         kiosk.current_ad = None
@@ -276,6 +294,10 @@ def main_loop():
                         sync_broadcast({"action": "MODE_SWITCH", "mode": "LOOP"})
                 else:
                     last_user_ts = now_ts
+
+            elif kiosk.mode == "INTERACTION":
+                # Flag engagement if we are in interaction mode
+                ad_tracker.set_engaged(True)
 
             # --- Render ---
             display_frame = None
