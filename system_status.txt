@@ -1,0 +1,43 @@
+============================================================
+           ADORIX KIOSK - SYSTEM FLOW SUMMARY
+============================================================
+Last Updated: 2026-03-16
+
+1. DATA SOURCE (SUPABASE)
+------------------------------------------------------------
+- Ads Table: Holds metadata (video_filename, ad_id, status).
+- Storage Bucket: Holds actual .mp4 files (adorix-ads-media).
+- Analytics Table: Receives viewership data.
+
+2. LOCAL STORAGE (THE "BASKET")
+------------------------------------------------------------
+- Location: backend/ads/
+- Strategy: Full local download.
+- Why: Minimizes loading time during playback. Kiosk never streams 
+       directly from web during the ad loop.
+
+3. REAL-TIME SYNCHRONIZATION
+------------------------------------------------------------
+- Realtime: Listener in backend/main.py triggers on any DB change.
+- Periodic: Fallback sync runs every 10 minutes.
+- Versioning: Uses sync_manifest.json to detect content changes 
+  even if filenames stay the same (via updated_at/size).
+
+4. AD SELECTION & PLAYBACK
+------------------------------------------------------------
+- IDLE: Loops through all synced ads automatically.
+- PERSONALIZED: Uses detector.py to find age/gender and chooses 
+  best ad from rules.json.
+
+5. ANALYTICS PIPELINE
+------------------------------------------------------------
+- Tracking: AdSessionTracker records duration & engagement.
+- ID Mapping: mapping.json links local files back to Supabase ad_id.
+- Reporting: Background thread sends data to analytics_events.
+
+============================================================
+✅ ALL SYSTEMS VERIFIED AND OPERATIONAL
+============================================================
+To verify manually, run:
+python backend/tests/verify_full_flow.py
+============================================================
