@@ -1,4 +1,5 @@
 import os
+import json
 import threading
 from supabase import create_client, Client
 from dotenv import load_dotenv
