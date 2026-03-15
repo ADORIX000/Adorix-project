@@ -14,18 +14,18 @@ import numpy as np
 from typing import Set
 
 # --- Services ---
-from services.vision.detector import AgeGenderDetector
-from services.ad_engine.selector import AdSelector
-from services.avatar_interaction.wakeword import WakeWordService
-from services.avatar_interaction.stt import listen_one_phrase
-from services.avatar_interaction.tts import speak
-from services.avatar_interaction.brain import adorix_brain
+from backend.modules.vision.detector import AgeGenderDetector
+from backend.modules.ad_engine.selector import AdSelector
+from backend.modules.wake_word.wakeword import WakeWordService
+from backend.modules.interaction import listen_one_phrase, speak
+from backend.modules.interaction.brain_engine import adorix_brain
+from backend.modules.storage import sync_ads
 
 # ============ CONFIG ============
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-RULES_PATH = os.path.join(PROJECT_ROOT, "services", "ad_engine", "rules.json")
-ADS_DIR = os.path.join(PROJECT_ROOT, "services", "ad_engine", "ads")
-DATA_DIR = os.path.join(PROJECT_ROOT, "services", "ad_engine", "data")
+RULES_PATH = os.path.join(PROJECT_ROOT, "backend", "modules", "ad_engine", "rules.json")
+ADS_DIR = os.path.join(PROJECT_ROOT, "backend", "ads")
+DATA_DIR = os.path.join(PROJECT_ROOT, "backend", "modules", "ad_engine", "data")
 
 # ============ GLOBAL STATE ============
 class KioskState:
@@ -136,6 +136,22 @@ async def websocket_server():
 
     import uvicorn
     server = uvicorn.Server(uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="critical"))
+    
+    @app.on_event("startup")
+    async def startup_event():
+        async def run_sync_periodically():
+            while True:
+                print("⏲️ Background Ad Sync triggered...")
+                try:
+                    # Run in thread pool since sync_ads is synchronous
+                    await asyncio.get_event_loop().run_in_executor(None, sync_ads)
+                except Exception as e:
+                    print(f"❌ Background Sync Error: {e}")
+                await asyncio.sleep(600)  # 10 minutes (600 seconds)
+        
+        asyncio.create_task(run_sync_periodically())
+        print("✅ Background Ad Sync Task Scheduled (Every 10m)")
+
     await server.serve()
 
 def start_websocket_thread():
