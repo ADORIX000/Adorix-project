@@ -72,3 +72,12 @@ class AdSelector:
 
     def ad_path(self, filename: str) -> str:
         return os.path.join(self.ads_dir, filename)
+
+    def get_next_idle_ad(self) -> str:
+        """Unconditionally advances to the next ad in the idle rotation."""
+        if not self.idle_ads:
+            return self.rules.get("DEFAULT", "generic_ad.mp4")
+            
+        filename = self.idle_ads[self.idle_index]
+        self.idle_index = (self.idle_index + 1) % len(self.idle_ads)
+        return filename
