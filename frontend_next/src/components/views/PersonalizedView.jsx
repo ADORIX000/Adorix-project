@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
-import AdPlayer from "../components/AdPlayer";
-import LiveStatus from "../components/LiveStatus";
+import AdPlayer from "../AdPlayer";
+import LiveStatus from "../LiveStatus";
 
 export default function PersonalizedView({ systemState, isConnected, sendJsonMessage }) {
   const [loopCount, setLoopCount] = React.useState(0);
