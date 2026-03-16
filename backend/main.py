@@ -204,7 +204,7 @@ async def lifespan(app: FastAPI):
     main_loop = asyncio.get_running_loop()
     
     print("\n" + "="*50)
-    print("🚀 ADORIX INTEGRATED SYSTEM INITIALIZING")
+    print("ADORIX INTEGRATED SYSTEM INITIALIZING")
     print("="*50)
     
     # 1. Initialize Ad Selector

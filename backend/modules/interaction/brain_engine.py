@@ -8,7 +8,7 @@ class BrainEngine:
         """
         Initializes the AI Brain using TinyLlama for RAG.
         """
-        print("🧠 [Brain] Loading AI Engine (TinyLlama)...")
+        print("[Brain] Loading AI Engine (TinyLlama)...")
         # Initialize the text-generation pipeline
         # We use float16 and low_cpu_mem_usage for faster loading and less memory
         self.pipe = pipeline(
@@ -20,7 +20,7 @@ class BrainEngine:
             },
             device_map="auto"
         )
-        print("✅ [Brain] AI Engine loaded successfully.")
+        print("[Brain] AI Engine loaded successfully.")
 
     def load_context_from_json(self, json_filename):
         """
