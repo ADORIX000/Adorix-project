@@ -27,7 +27,7 @@ from backend.modules.tracker import AdSessionTracker
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 RULES_PATH = os.path.join(PROJECT_ROOT, "backend", "modules", "ad_engine", "rules.json")
 ADS_DIR = os.path.join(PROJECT_ROOT, "backend", "ads")
-DATA_DIR = os.path.join(PROJECT_ROOT, "backend", "modules", "ad_engine", "data")
+DATA_DIR = ADS_DIR
 
 # ============ GLOBAL STATE ============
 class KioskState:

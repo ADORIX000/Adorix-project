@@ -64,8 +64,8 @@ def sync_ads():
     # 1. Fetch active ads (filenames and IDs) from Supabase
     try:
         print("🔍 Fetching active ads from database...")
-        # We select both video_filename and ad_id (UUID)
-        response = supabase.table("ads").select("ad_id, video_filename").eq("status", "active").execute()
+        # We select video_filename, ad_id (UUID), and description
+        response = supabase.table("ads").select("ad_id, video_filename, description").eq("status", "active").execute()
         
         active_filenames = {item['video_filename'] for item in response.data if item.get('video_filename')}
         # Create mapping of filename -> ad_id
@@ -103,10 +103,23 @@ def sync_ads():
         # Use updated_at or size as a simple version check
         remote_version = str(remote_info.get('updated_at', remote_info.get('metadata', {}).get('size', '')))
         
+        # Get description for this ad
+        ad_data = next((item for item in response.data if item['video_filename'] == filename), {})
+        description = ad_data.get('description', '')
+
         local_path = os.path.join(LOCAL_ADS_DIR, filename)
+        json_path = os.path.join(LOCAL_ADS_DIR, filename.replace(".mp4", ".json"))
         local_version = manifest.get(filename)
 
         needs_download = not os.path.exists(local_path) or local_version != remote_version
+
+        # 3a. Save/Update Description JSON
+        try:
+            desc_payload = {"description": description}
+            with open(json_path, "w") as f:
+                json.dump(desc_payload, f, indent=4)
+        except Exception as e:
+            print(f"⚠️ Failed to save description for {filename}: {e}")
 
         if needs_download:
             action = "Downloading missing" if not os.path.exists(local_path) else "Updating"
@@ -135,7 +148,7 @@ def sync_ads():
         local_files = os.listdir(LOCAL_ADS_DIR)
         for local_file in local_files:
             # Don't delete metadata files
-            if local_file in ["sync_manifest.json", "mapping.json"]:
+            if local_file in ["sync_manifest.json", "mapping.json"] or local_file.endswith(".json"):
                 continue
             
             if local_file not in active_filenames:
