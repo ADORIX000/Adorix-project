@@ -23,7 +23,7 @@ def run_loop_test():
 
     # 1. Setup Paths
     rules_path = os.path.join(current_dir, "modules", "ad_engine", "rules.json")
-    ads_dir = os.path.abspath(os.path.join(current_dir, "..", "frontend", "public", "ads"))
+    ads_dir = os.path.abspath(os.path.join(current_dir, "ads"))
     frontend_loop_view = os.path.abspath(os.path.join(current_dir, "..", "frontend", "src", "views", "LoopView.jsx"))
 
     # 2. Check Backend AdSelector Logic

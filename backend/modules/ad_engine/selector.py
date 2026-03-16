@@ -17,7 +17,8 @@ class AdSelector:
 
     def _load_ads(self):
         try:
-            files = [f for f in sorted(os.listdir(self.ads_dir)) if os.path.isfile(os.path.join(self.ads_dir, f))]
+            files = [f for f in sorted(os.listdir(self.ads_dir)) 
+                     if os.path.isfile(os.path.join(self.ads_dir, f)) and f.lower().endswith(".mp4")]
             # If rules request shuffling, shuffle once on load
             if self.rules.get("SHUFFLE_IDLE"):
                 random.shuffle(files)
