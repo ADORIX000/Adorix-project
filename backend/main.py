@@ -257,6 +257,22 @@ app.add_middleware(
 if os.path.exists("backend/ads"):
     app.mount("/ads", StaticFiles(directory="backend/ads"), name="ads")
 
+@app.get("/api/ads")
+async def get_ads():
+    """Returns a list of all synced ads in the local folder."""
+    if not os.path.exists("backend/ads"):
+        return []
+    files = [f for f in os.listdir("backend/ads") if f.endswith(".mp4")]
+    return sorted(files)
+
+@app.get("/api/status")
+async def get_status():
+    return {
+        "system_id": state.system_id,
+        "mode": state.mode,
+        "ad_url": state.ad_url
+    }
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
