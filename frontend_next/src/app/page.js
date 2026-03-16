@@ -25,7 +25,12 @@ export default function App() {
   return (
     <div className="w-screen h-screen bg-black overflow-hidden relative">
       {/* 1. Dynamic Stage Rendering */}
-      {systemId === 1 && <LoopView />}
+      {systemId === 1 && (
+        <LoopView 
+            adUrl={activeAd} 
+            onEnded={() => sendJsonMessage({ type: "NEXT_AD" })} 
+        />
+      )}
       {systemId === 2 && (
         <PersonalizedView 
             systemState={{ ad: activeAd }} 

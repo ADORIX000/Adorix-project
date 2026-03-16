@@ -7,18 +7,13 @@ from collections import Counter # <-- NEW: For calculating the majority vote
 from modules.ad_engine.selector import AdSelector
 
 class AdorixVision:
-    def __init__(self, broadcast_callback):
+    def __init__(self, broadcast_callback, selector):
         self.broadcast = broadcast_callback
+        self.selector = selector
         self.last_analysis = 0
         self.is_analyzing = False
         
-        # --- NEW: AD SELECTOR INITIALIZATION ---
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        rules_path = os.path.join(current_dir, "modules", "ad_engine", "rules.json")
-        ads_dir = os.path.abspath(os.path.join(current_dir, "ads"))
-        self.selector = AdSelector(rules_path, ads_dir)
-        
-        # --- NEW: BUFFER STATE VARIABLES ---
+        # --- BUFFER STATE VARIABLES ---
         self.detection_buffer = []      # Holds all predictions made in the 2-second window
         self.buffer_start_time = None   # Tracks when the timer started
         

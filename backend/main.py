@@ -21,6 +21,7 @@ if modules_dir not in sys.path:
 from wake_word import WakeWordService
 from interaction.interaction_manager import start_interaction_loop
 from vision_service import AdorixVision
+from modules.ad_engine.selector import AdSelector
 
 # --- Global System State ---
 class SystemState:
@@ -39,6 +40,7 @@ connected_clients = []
 main_loop = None 
 wake_word_service = None
 vision_service = None
+ad_selector = None
   
 # --- Hardware Services Reset Helpers ---
 def restart_wake_word_service():
@@ -205,11 +207,21 @@ async def lifespan(app: FastAPI):
     print("🚀 ADORIX INTEGRATED SYSTEM INITIALIZING")
     print("="*50)
     
-    # 1. Start Wake Word listener
+    # 1. Initialize Ad Selector
+    global ad_selector
+    rules_path = os.path.join(current_dir, "modules", "ad_engine", "rules.json")
+    ads_dir = os.path.join(current_dir, "ads")
+    ad_selector = AdSelector(rules_path, ads_dir)
+    
+    # Set initial ad
+    with state.lock:
+        state.ad_url = ad_selector.get_next_idle_ad()
+
+    # 2. Start Wake Word listener
     restart_wake_word_service()
     
-    # 2. Start Vision camera thread
-    vision_service = AdorixVision(broadcast_callback=on_vision_update)
+    # 3. Start Vision camera thread
+    vision_service = AdorixVision(broadcast_callback=on_vision_update, selector=ad_selector)
     threading.Thread(target=vision_service.start, daemon=True).start()
     
     # 3. Start Ad Synchronization & Realtime Listener
@@ -303,8 +315,18 @@ async def websocket_endpoint(websocket: WebSocket):
                             state.mode = "IDLE"
                             state.avatar_state = "SLEEP"
                             state.subtitle = ""
-                            state.ad_url = ""
+                            # When reverting, pick a fresh idle ad
+                            state.ad_url = ad_selector.get_next_idle_ad()
                     sync_broadcast()
+                
+                # NEXT_AD from frontend (unified loop engine)
+                elif msg.get("type") == "NEXT_AD":
+                    with state.lock:
+                        if state.system_id == 1:
+                            new_ad = ad_selector.get_next_idle_ad()
+                            print(f"\n>>> [State Machine] Next Ad Requested. Advancing: {new_ad}")
+                            state.ad_url = new_ad
+                            sync_broadcast()
             except Exception as e:
                 print(f"!!! [WS] Error parsing message: {e}")
     except WebSocketDisconnect:
