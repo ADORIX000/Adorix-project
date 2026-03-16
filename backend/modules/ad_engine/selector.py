@@ -17,7 +17,8 @@ class AdSelector:
 
     def _load_ads(self):
         try:
-            files = [f for f in sorted(os.listdir(self.ads_dir)) if os.path.isfile(os.path.join(self.ads_dir, f))]
+            files = [f for f in sorted(os.listdir(self.ads_dir)) 
+                     if os.path.isfile(os.path.join(self.ads_dir, f)) and f.lower().endswith(".mp4")]
             # If rules request shuffling, shuffle once on load
             if self.rules.get("SHUFFLE_IDLE"):
                 random.shuffle(files)
@@ -71,3 +72,12 @@ class AdSelector:
 
     def ad_path(self, filename: str) -> str:
         return os.path.join(self.ads_dir, filename)
+
+    def get_next_idle_ad(self) -> str:
+        """Unconditionally advances to the next ad in the idle rotation."""
+        if not self.idle_ads:
+            return self.rules.get("DEFAULT", "generic_ad.mp4")
+            
+        filename = self.idle_ads[self.idle_index]
+        self.idle_index = (self.idle_index + 1) % len(self.idle_ads)
+        return filename

@@ -47,7 +47,7 @@ class ProductQAEngine:
                     with open(filepath, 'r', encoding='utf-8') as f:
                         clean_name = filename.replace(".json", "")
                         self.product_data[clean_name] = json.load(f)
-            print(f"✓ Loaded {len(self.product_data)} products")
+            print(f"Loaded {len(self.product_data)} products")
         except Exception as e:
             print(f"Error loading products: {e}")
     

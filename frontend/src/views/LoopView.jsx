@@ -1,35 +1,63 @@
-import { useState } from 'react';
-
-const adVideos = [
-  '/ads/10-15_male.mp4',
-  '/ads/10-15_female.mp4',
-  '/ads/16-29_male.mp4',
-  '/ads/16-29_female.mp4',
-  '/ads/30-39_male.mp4',
-  '/ads/30-39_female.mp4',
-  '/ads/40-49_male.mp4',
-  '/ads/40-49_female.mp4',
-  '/ads/50-59_male.mp4',
-  '/ads/50-59_female.mp4',
-  '/ads/above-60_male.mp4',
-  '/ads/above-60_female.mp4',
-
-];
+import { useState, useEffect } from 'react';
 
 const LoopView = () => {
+  const [adVideos, setAdVideos] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // 1. Fetch the list of ads from the backend
+    const fetchAds = async () => {
+      try {
+        const response = await fetch('/api/ads');
+        const data = await response.json();
+        
+        // Add /ads/ prefix to each filename
+        const fullPaths = data.map(name => `/ads/${name}`);
+        setAdVideos(fullPaths);
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to fetch ads:", err);
+        setError("Could not connect to backend server.");
+        setLoading(false);
+      }
+    };
+
+    fetchAds();
+  }, []);
 
   const handleVideoEnd = () => {
-    console.log("Video finished, moving to next...");
+    if (adVideos.length === 0) return;
     setCurrentIndex((prevIndex) => (prevIndex + 1) % adVideos.length);
-    setError(null); // Reset error on change
+    setError(null);
   };
 
   const handleVideoError = (e) => {
     console.error("Video failed to load:", adVideos[currentIndex]);
     setError(`Failed to load: ${adVideos[currentIndex]}`);
   };
+
+  if (loading) {
+    return (
+      <div className="w-screen h-screen bg-black flex items-center justify-center text-white font-mono">
+        <div className="p-8 border border-white/20 rounded-xl bg-white/5 backdrop-blur-md">
+            ⌛ Loading Ad Inventory...
+        </div>
+      </div>
+    );
+  }
+
+  if (adVideos.length === 0 && !loading) {
+     return (
+        <div className="w-screen h-screen bg-black flex items-center justify-center text-white font-mono text-center">
+             <div className="p-8 border border-red-500/50 rounded-xl bg-red-500/5">
+                ❌ No active ads found in /ads folder.<br/>
+                <span className="text-gray-400 text-sm">Please run synchronization first.</span>
+             </div>
+        </div>
+     );
+  }
 
   return (
     <div style={{ position: 'relative', width: '100vw', height: '100vh', background: '#000' }}>
