@@ -9,7 +9,7 @@ export default function App() {
   const [systemId, setSystemId] = useState(1);
   const [activeAd, setActiveAd] = useState('10-15_female.mp4');
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
-  const { lastMessage, sendJsonMessage } = useSocket('ws://localhost:8001/ws');
+  const { lastMessage, sendJsonMessage } = useSocket('ws://localhost:8002/ws');
 
   useEffect(() => {
     if (lastMessage) {

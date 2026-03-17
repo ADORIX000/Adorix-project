@@ -4,23 +4,25 @@ import torch
 from transformers import pipeline
 
 class BrainEngine:
+
     def __init__(self):
-        """
-        Initializes the AI Brain using TinyLlama for RAG.
-        """
-        print("[Brain] Loading AI Engine (TinyLlama)...")
-        # Initialize the text-generation pipeline
-        # We use float16 and low_cpu_mem_usage for faster loading and less memory
-        self.pipe = pipeline(
-            "text-generation",
-            model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-            model_kwargs={
-                "dtype": torch.float16,
-                "low_cpu_mem_usage": True,
-            },
-            device_map="auto"
-        )
-        print("[Brain] AI Engine loaded successfully.")
+        self._pipe = None
+
+    @property
+    def pipe(self):
+        if self._pipe is None:
+            print("[Brain] First request: Loading AI Engine (TinyLlama)...")
+            self._pipe = pipeline(
+                "text-generation",
+                model="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+                model_kwargs={
+                    "dtype": torch.float16,
+                    "low_cpu_mem_usage": True,
+                },
+                device_map="auto"
+            )
+            print("[Brain] AI Engine loaded successfully.")
+        return self._pipe
 
     def load_context_from_json(self, json_filename):
         """
