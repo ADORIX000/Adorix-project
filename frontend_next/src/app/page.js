@@ -30,12 +30,14 @@ export default function App() {
       {/* 1. Dynamic Stage Rendering */}
       {systemId === 1 && (
         <LoopView 
+            key="loop"
             adUrl={activeAd} 
             onEnded={() => sendJsonMessage({ type: "NEXT_AD" })} 
         />
       )}
       {systemId === 2 && (
         <PersonalizedView 
+            key="personalized"
             systemState={{ ad: activeAd }} 
             isConnected={!!lastMessage} 
             sendJsonMessage={sendJsonMessage}
@@ -43,6 +45,7 @@ export default function App() {
       )}
       {systemId === 3 && (
         <InteractionView 
+          key="interaction"
           adUrl={activeAd} 
           avatarState={avatarState} 
           setAvatarState={setAvatarState} 
