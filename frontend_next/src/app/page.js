@@ -13,7 +13,8 @@ export default function App() {
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
   // Using 127.0.0.1 and direct URL to ensure robust connection in dev
   // Using local proxy /ws to avoid CORS/port issues
-  const { lastMessage, sendJsonMessage } = useSocket(`ws://${window.location.host}/ws`);
+  const socketUrl = typeof window !== 'undefined' ? `ws://${window.location.host}/ws` : null;
+  const { lastMessage, sendJsonMessage } = useSocket(socketUrl);
 
   useEffect(() => {
     if (lastMessage) {
