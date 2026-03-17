@@ -146,10 +146,32 @@ class AdorixVision:
 
     def start(self):
         print("[VISION] Starting camera capture...")
-        cap = cv2.VideoCapture(0)
+        cap = None
         
-        if not cap.isOpened():
-            print("[ERROR] Could not open webcam.")
+        # Try different indices and backends if the first fail (Windows MSMF issues)
+        for index in [0, 1]:
+            for backend in [None, cv2.CAP_DSHOW]:
+                try:
+                    if backend:
+                        cap = cv2.VideoCapture(index + backend)
+                    else:
+                        cap = cv2.VideoCapture(index)
+                    
+                    if cap.isOpened():
+                        # Quick test grab
+                        ret, test_frame = cap.read()
+                        if ret:
+                            print(f"[VISION] Successfully opened camera at index {index} with backend {backend}")
+                            break
+                        else:
+                            cap.release()
+                except Exception as e:
+                    print(f"[VISION] Failed index {index} backend {backend}: {e}")
+            if cap and cap.isOpened(): 
+                break
+
+        if not cap or not cap.isOpened():
+            print("[ERROR] Could not open any webcam. Vision service will exit.")
             return
 
         try:

@@ -12,10 +12,12 @@ export default function App() {
   const [activeAd, setActiveAd] = useState('10-15_female.mp4');
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
   // Using 127.0.0.1 and direct URL to ensure robust connection in dev
-  const { lastMessage, sendJsonMessage } = useSocket('ws://127.0.0.1:8001/ws');
+  // Using local proxy /ws to avoid CORS/port issues
+  const { lastMessage, sendJsonMessage } = useSocket(`ws://${window.location.host}/ws`);
 
   useEffect(() => {
     if (lastMessage) {
+      console.log(">>> [WebSocket] Received update:", lastMessage);
       if (lastMessage.system_id) setSystemId(lastMessage.system_id);
       if (lastMessage.ad_url) setActiveAd(lastMessage.ad_url);
       if (lastMessage.avatar_state) setAvatarState(lastMessage.avatar_state);
@@ -38,7 +40,13 @@ export default function App() {
             sendJsonMessage={sendJsonMessage}
         />
       )}
-      {systemId === 3 && <InteractionView adUrl={activeAd} avatarState={avatarState} />}
+      {systemId === 3 && (
+        <InteractionView 
+          adUrl={activeAd} 
+          avatarState={avatarState} 
+          setAvatarState={setAvatarState} 
+        />
+      )}
 
       {/* 2. PRELOADING ENGINE */}
       <div className="hidden opacity-0 pointer-events-none absolute -z-50">

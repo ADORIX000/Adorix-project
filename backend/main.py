@@ -17,6 +17,8 @@ modules_dir = os.path.join(current_dir, 'modules')
 if modules_dir not in sys.path:
     sys.path.append(modules_dir)
 
+ads_dir = os.path.join(current_dir, "ads")
+
 # Local modules
 from wake_word import WakeWordService
 from interaction.interaction_manager import start_interaction_loop
@@ -104,25 +106,41 @@ def interaction_state_callback(avatar_state=None, subtitle=None):
 def on_vision_update(data):
     """
     Central State Machine rules defined here in the Vision Callback.
-    Rules: 
-      Loop(1) -> Personalized(2) [If face detected]
-      Personalized(2) -> Loop(1) [Triggered by frontend AD_LOOP_TIMEOUT after 2 loops]
-      Interaction(3) -> Loop(1)  [If face lost - Immediately, aborts Interaction Thread]
     """
-    new_id = data.get("system_id")
-    ad_url = data.get("ad_url", "")
-    
-    with state.lock:
-        current_id = state.system_id
+    try:
+        new_id = data.get("system_id")
+        ad_url = data.get("ad_url", "")
         
-        # 1 -> 2: Transition from Loop to Personalized Ad
-        if current_id == 1 and new_id == 2:
-            print(f"\n>>> [State Machine] Loop -> Personalized (Ad: {ad_url})")
-            state.system_id = 2
-            state.ad_url = ad_url
-            sync_broadcast()
+        with state.lock:
+            current_id = state.system_id
             
-        # DEPRECATED: We now rely on STT 10-second auditory silence timeout!
+            # 1 -> 2: Transition from Loop to Personalized Ad
+            if current_id == 1 and new_id == 2:
+                print(f"\n>>> [State Machine] Loop -> Personalized (Ad: {ad_url})")
+                state.system_id = 2
+                state.ad_url = ad_url
+                sync_broadcast()
+                
+            # 2 -> 1: User walked away during Personalized Ad
+            elif current_id == 2 and new_id == 1:
+                print(f"\n>>> [State Machine] User Lost. Personalized -> Loop")
+                state.system_id = 1
+                if ad_selector:
+                    state.ad_url = ad_selector.get_next_idle_ad()
+                sync_broadcast()
+
+            # 3 -> 1: User walked away during Interaction
+            elif current_id == 3 and new_id == 1:
+                print(f"\n>>> [State Machine] User Lost. Aborting Interaction -> Loop")
+                state.system_id = 1
+                state.mode = "IDLE"
+                state.avatar_state = "SLEEP"
+                state.subtitle = ""
+                if ad_selector:
+                    state.ad_url = ad_selector.get_next_idle_ad()
+                sync_broadcast()
+    except Exception as e:
+        print(f"!!! [State Machine] Error in vision callback: {e}")
 
 def on_wake_word():
     """
@@ -210,7 +228,6 @@ async def lifespan(app: FastAPI):
     # 1. Initialize Ad Selector
     global ad_selector
     rules_path = os.path.join(current_dir, "modules", "ad_engine", "rules.json")
-    ads_dir = os.path.join(current_dir, "ads")
     ad_selector = AdSelector(rules_path, ads_dir)
     
     # Set initial ad
@@ -236,16 +253,16 @@ async def lifespan(app: FastAPI):
         # Trigger sync immediately
         threading.Thread(target=sync_ads, daemon=True).start()
 
-    try:
-        print(">>> [System] Starting Supabase Realtime Listener for ads...")
-        supabase.channel("ads_sync").on_postgres_changes(
-            event="*",
-            schema="public",
-            table="ads",
-            callback=handle_ad_change
-        ).subscribe()
-    except Exception as e:
-        print(f"!!! [System] Failed to start Realtime listener: {e}")
+    # try:
+    #     print(">>> [System] Starting Supabase Realtime Listener for ads...")
+    #     supabase.channel("ads_sync").on_postgres_changes(
+    #         event="*",
+    #         schema="public",
+    #         table="ads",
+    #         callback=handle_ad_change
+    #     ).subscribe()
+    # except Exception as e:
+    #     print(f"!!! [System] Failed to start Realtime listener: {e}")
 
     # 4. Start periodic fallback sync
     asyncio.create_task(periodic_sync_task())
@@ -266,15 +283,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if os.path.exists("backend/ads"):
-    app.mount("/ads", StaticFiles(directory="backend/ads"), name="ads")
+if os.path.exists(ads_dir):
+    app.mount("/ads", StaticFiles(directory=ads_dir), name="ads")
 
 @app.get("/api/ads")
 async def get_ads():
     """Returns a list of all synced ads in the local folder."""
-    if not os.path.exists("backend/ads"):
+    if not os.path.exists(ads_dir):
         return []
-    files = [f for f in os.listdir("backend/ads") if f.endswith(".mp4")]
+    files = [f for f in os.listdir(ads_dir) if f.endswith(".mp4")]
     return sorted(files)
 
 @app.get("/api/status")
