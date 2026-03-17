@@ -327,7 +327,7 @@ async def websocket_endpoint(websocket: WebSocket):
                 if msg.get("type") == "AD_LOOP_TIMEOUT":
                     with state.lock:
                         if state.system_id == 2:
-                            print("\n>>> [State Machine] Personalized Ad Timeout (Played twice). Reverting -> Loop Mode")
+                            print("\n>>> [State Machine] Personalized Ad Timeout (Played 3 times). Reverting -> Loop Mode")
                             state.system_id = 1
                             state.mode = "IDLE"
                             state.avatar_state = "SLEEP"

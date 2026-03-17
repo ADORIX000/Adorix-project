@@ -6,14 +6,19 @@ import LiveStatus from "../LiveStatus";
 export default function PersonalizedView({ systemState, isConnected, sendJsonMessage }) {
   const [loopCount, setLoopCount] = React.useState(0);
 
+  // Task #11: Reset loopCount if the ad URL changes (new user or new ad selection)
+  React.useEffect(() => {
+    setLoopCount(0);
+  }, [systemState.ad]);
+
   const handleAdEnd = (e) => {
     const nextCount = loopCount + 1;
     setLoopCount(nextCount);
     console.log(`[Personalized] Ad loop count: ${nextCount}`);
     
-    // We hit 2 loops. Tell backend we are done, allowing it to revert if no user is present.
-    if (nextCount >= 2) {
-        console.log("[Personalized] Reached 2 loops, triggering timeout...");
+    // We hit 3 loops. Tell backend we are done, allowing it to revert if no user is present.
+    if (nextCount >= 3) {
+        console.log("[Personalized] Reached 3 loops, triggering timeout...");
         sendJsonMessage({ type: "AD_LOOP_TIMEOUT" });
     } else {
         // Explicitly play again for loop 2
