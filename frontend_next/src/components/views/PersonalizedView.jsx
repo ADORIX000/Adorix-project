@@ -4,27 +4,22 @@ import AdPlayer from "../AdPlayer";
 import LiveStatus from "../LiveStatus";
 
 export default function PersonalizedView({ systemState, isConnected, sendJsonMessage }) {
-  const [loopCount, setLoopCount] = React.useState(0);
-
-  // Task #11: Reset loopCount if the ad URL changes (new user or new ad selection)
+  // Clean up unused state
   React.useEffect(() => {
-    setLoopCount(0);
+    // Initialization or reset logic if needed
   }, [systemState.ad]);
 
   const handleAdEnd = (e) => {
-    const nextCount = loopCount + 1;
-    setLoopCount(nextCount);
-    console.log(`[Personalized] Ad loop count: ${nextCount}`);
+    // Notify the backend that an ad loop has finished.
+    // The backend's AdorixStateManager increments its play_count and will 
+    // either push a new STATE 2 (replay) or push STATE 1 (return to loop).
+    console.log("[Personalized] Ad ended, notifying backend...");
+    sendJsonMessage({ type: "AD_ENDED" });
     
-    // We hit 3 loops. Tell backend we are done, allowing it to revert if no user is present.
-    if (nextCount >= 3) {
-        console.log("[Personalized] Reached 3 loops, triggering timeout...");
-        sendJsonMessage({ type: "AD_LOOP_TIMEOUT" });
-    } else {
-        // Explicitly play again for loop 2
-        if (e && e.target) {
-            e.target.play().catch(err => console.error("Error playing ad:", err));
-        }
+    // Explicitly play again locally to keep video rolling smoothly
+    // until the backend pushes the state transition to ID 1.
+    if (e && e.target) {
+        e.target.play().catch(err => console.error("Error playing ad:", err));
     }
   };
 

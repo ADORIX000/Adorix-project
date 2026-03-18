@@ -12,8 +12,8 @@ export default function App() {
   const [activeAd, setActiveAd] = useState('10-15_female.mp4');
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
   
-  // Connect cleanly to the backend via our Next.js reverse proxy (port 8002)
-  const socketUrl = typeof window !== 'undefined' ? `ws://${window.location.host}/ws` : null;
+  // Connect directly to the backend on port 8002 to ensure robust WebSocket communication
+  const socketUrl = typeof window !== 'undefined' ? `ws://localhost:8002/ws` : null;
   const { lastMessage, sendJsonMessage } = useSocket(socketUrl);
 
   // Sync state seamlessly from backend
