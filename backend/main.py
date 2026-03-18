@@ -332,6 +332,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 msg = json.loads(raw)
                 if msg.get("type") == "AD_ENDED":
                     manager.on_ad_end()
+                elif msg.get("type") == "WAKE_WORD_DETECTED":
+                    manager.on_wake_word()
             except Exception: pass
     except WebSocketDisconnect:
         manager.clients.remove(websocket)

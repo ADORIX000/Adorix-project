@@ -58,6 +58,16 @@ export default function App() {
         <video src="/avatar-videos/listening.webm" preload="auto" muted />
         <video src="/avatar-videos/talking.webm" preload="auto" muted />
       </div>
+
+      {/* DEBUG BUTTON: Manually trigger wake word in State 2 */}
+      {systemId === 2 && (
+        <button 
+          onClick={() => sendJsonMessage({ type: "WAKE_WORD_DETECTED" })}
+          className="absolute bottom-4 right-4 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-bold opacity-50 hover:opacity-100 transition-opacity"
+        >
+          [DEBUG] Trigger Wake Word
+        </button>
+      )}
     </div>
   );
 }
