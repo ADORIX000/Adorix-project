@@ -124,29 +124,40 @@ class AdorixStateManager:
         print(">>> [S1] Entering LOOP MODE")
         self.system_id = 1
         self.avatar_state = "HIDDEN"
-        self._stop_wake_word() # Ensure mic is free
+        self._stop_wake_word()  # Stop the wake word engine to free up hardware (CPU/Mic)
 
-        if not self.ad_url: self.ad_url = self.ad_selector.get_next_idle_ad()
+        # Get the next idle ad for continuous playback
+        self.ad_url = self.ad_selector.get_next_idle_ad()
         await self.broadcast_state()
 
-        while not self.command_queue.empty(): self.command_queue.get_nowait()
+        # Clear the queue of any stale commands before we begin the loop
+        while not self.command_queue.empty(): 
+            self.command_queue.get_nowait()
 
         while self.system_id == 1:
-            try: msg = await asyncio.wait_for(self.command_queue.get(), timeout=1.0)
-            except asyncio.TimeoutError: continue
+            try: 
+                msg = await asyncio.wait_for(self.command_queue.get(), timeout=1.0)
+            except asyncio.TimeoutError: 
+                continue
 
             if msg.get("type") == "VISION":
                 data = msg.get("data", {})
                 if data.get("system_id") == 2:
+                    # Enforce Cooldown: Don't rapidly re-trigger if someone is lingering
                     if (time.time() - self.last_timeout_time) < self.COOLDOWN_SECONDS:
                         continue
-                    # ── Face Detected: Transition to State 2 ──
-                    self.system_id = 2
+                        
+                    # ── Face Detected: Perform State Transition ──
+                    self.system_id = 2  # Transition to Personalized Mode
                     self.ad_url = data.get("ad_url", "")
                     self.play_count = 0
+                    
+                    # Return out of this function to allow the main dispatcher (`run`) 
+                    # to route to `_state_personalized()`
                     return
 
             elif msg.get("type") == "AD_ENDED":
+                # Continuous Playlist: Get next ad and broadcast instantly
                 self.ad_url = self.ad_selector.get_next_idle_ad()
                 await self.broadcast_state()
 
@@ -157,6 +168,8 @@ class AdorixStateManager:
         print(f">>> [S2] Entering PERSONALIZED MODE (ad={self.ad_url})")
         self.system_id = 2
         self.play_count = 0
+        session_start_time = time.time()
+        
         self.wake_word_event.clear()
         self._start_wake_word() # Boot Sherpa-ONNX in background
         await self.broadcast_state()
@@ -164,27 +177,56 @@ class AdorixStateManager:
         while not self.command_queue.empty(): self.command_queue.get_nowait()
 
         while self.system_id == 2:
-            # ── Check for Wake Word First ──
+            # ── Priority 1: Check for Wake Word First ──
             if self.wake_word_event.is_set():
                 print(">>> [S2] Wake word detected! Transitioning to S3")
+                watch_time = int(time.time() - session_start_time)
+                # Fire background analytics task without blocking
+                asyncio.create_task(self._push_analytics(self.ad_url, watch_time, engage_count=1))
+                
                 self.system_id = 3
                 return
 
-            try: msg = await asyncio.wait_for(self.command_queue.get(), timeout=0.1)
+            try: 
+                msg = await asyncio.wait_for(self.command_queue.get(), timeout=0.1)
             except asyncio.TimeoutError:
-                await asyncio.sleep(0.01)
                 continue
 
+            # ── Priority 2: Vision Lost (User Walked Away) ──
+            if msg.get("type") == "VISION" and msg.get("data", {}).get("system_id") == 1:
+                print(">>> [S2] Vision lost. User walked away. Back to S1.")
+                watch_time = int(time.time() - session_start_time)
+                asyncio.create_task(self._push_analytics(self.ad_url, watch_time, engage_count=0))
+                
+                self.system_id = 1
+                self._stop_wake_word()
+                return
+
+            # ── Priority 3: Ad Loop Limit Reached ──
             if msg.get("type") == "AD_ENDED":
                 self.play_count += 1
                 if self.play_count >= self.MAX_PLAY_COUNT:
                     print(f">>> [S2] Played {self.MAX_PLAY_COUNT} times. No wake word. Back to S1.")
+                    watch_time = int(time.time() - session_start_time)
+                    asyncio.create_task(self._push_analytics(self.ad_url, watch_time, engage_count=0))
+                    
                     self.last_timeout_time = time.time()
                     self.system_id = 1
                     self._stop_wake_word()
                     return
                 else:
                     await self.broadcast_state() # Play next loop
+
+    async def _push_analytics(self, ad_id: str, watch_time: int, engage_count: int):
+        """Dummy helper to format and print Supabase payload without blocking."""
+        payload = {
+            "ad_id": ad_id,
+            "watch_time_seconds": watch_time,
+            "engage_count": engage_count,
+            "timestamp": time.time()
+        }
+        print(f"[ANALYTICS] Ready for Supabase -> {json.dumps(payload)}")
+        # In the future, the Supabase insert call goes here
 
     # ══════════════════════════════════════════════════════════════════════════
     #  STATE 3 — INTERACTION MODE

@@ -206,9 +206,12 @@ class AdorixVision:
                                 
                                 # Broadcast the winner to React with system_id: 2 (Personalized Mode)
                                 self.broadcast({
-                                    "system_id": 2, 
-                                    "ad_url": ad_name,
-                                    "demographics": [winning_demographic]
+                                    "type": "VISION",
+                                    "data": {
+                                        "system_id": 2, 
+                                        "ad_url": ad_name,
+                                        "demographics": [winning_demographic]
+                                    }
                                 })
                             
                             # Reset the clock so it continues to evaluate every 2 seconds
