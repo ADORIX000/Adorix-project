@@ -7,10 +7,6 @@ const nextConfig = {
         destination: 'http://localhost:8002/ws',
       },
       {
-        source: '/ads/:path*',
-        destination: 'http://localhost:8002/ads/:path*',
-      },
-      {
         source: '/api/:path*',
         destination: 'http://localhost:8002/api/:path*',
       },

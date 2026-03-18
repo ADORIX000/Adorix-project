@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import { AVATAR_STATES } from '../components/avatar/avatarStates';
-import LoopView from '../components/views/LoopView';
-import PersonalizedView from '../components/views/PersonalizedView';
-import InteractionView from '../components/views/InteractionView';
+import State1_Loop from '../components/views/State1_Loop';
+import State2_Personalized from '../components/views/State2_Personalized';
+import State3_Interaction from '../components/views/State3_Interaction';
 
 export default function App() {
   const [systemId, setSystemId] = useState(1);
@@ -29,14 +29,14 @@ export default function App() {
     <div className="w-screen h-screen bg-black overflow-hidden relative">
       {/* 1. Dynamic Stage Rendering based on State Machine */}
       {systemId === 1 && (
-        <LoopView 
+        <State1_Loop 
             key="loop"
             adUrl={activeAd} 
             onEnded={() => sendJsonMessage({ type: "AD_ENDED" })} 
         />
       )}
       {systemId === 2 && (
-        <PersonalizedView 
+        <State2_Personalized 
             key="personalized"
             systemState={{ ad: activeAd }} 
             isConnected={!!lastMessage} 
@@ -44,7 +44,7 @@ export default function App() {
         />
       )}
       {systemId === 3 && (
-        <InteractionView 
+        <State3_Interaction 
           key="interaction"
           adUrl={activeAd} 
           avatarState={avatarState} 

@@ -3,7 +3,7 @@ import React from "react";
 import AdPlayer from "../AdPlayer";
 import LiveStatus from "../LiveStatus";
 
-export default function PersonalizedView({ systemState, isConnected, sendJsonMessage }) {
+export default function State2_Personalized({ systemState, isConnected, sendJsonMessage }) {
   // Clean up unused state
   React.useEffect(() => {
     // Initialization or reset logic if needed

@@ -4,7 +4,7 @@ import AvatarOverlay from '../avatar/AvatarOverlay';
 import { Mic } from 'lucide-react';
 import { AVATAR_STATES } from '../avatar/avatarStates';
 
-export default function InteractionView({ adUrl, avatarState, setAvatarState }) {
+export default function State3_Interaction({ adUrl, avatarState, setAvatarState }) {
   // Determine if the AI is actively listening to the user
   // (If she is IDLE, it means she is waiting for the user to speak)
   const isListening = avatarState === AVATAR_STATES.IDLE;
