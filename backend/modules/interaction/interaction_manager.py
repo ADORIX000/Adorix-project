@@ -49,46 +49,50 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
     time.sleep(2.5)
     
     if state_callback:
-        state_callback(avatar_state="talking.webm", subtitle="Hello! I'm Adorix. Do you have any questions?")
+        state_callback(avatar_state="speaking.webm", subtitle="Hello! Do you have any questions about this ad?")
         
-    speak("Hello! I'm Adorix. I saw you were looking at this ad. Do you have any questions for me?")
+    speak("Hello! Do you have any questions about this ad?")
     
     # --- 2. Enter continuous listening loop ---
     while True:
         if is_active_callback and not is_active_callback(): return "ABORTED"
         if state_callback:
-            state_callback(avatar_state="listening.webm", subtitle="I'm listening...")
+            state_callback(avatar_state="listening.webm", subtitle="Listening...")
 
-        print("\n>>> [System] Listening for user STT input...")
-        # STT Engine listens for exactly 7 seconds
-        user_question = listen_one_phrase(timeout=7)
+        print("\n>>> [System] Listening for user STT input (5-second timeout)...")
+        # STT Engine listens for EXACTLY 5 seconds to prevent hanging
+        user_question = listen_one_phrase(timeout=5)
         
         if is_active_callback and not is_active_callback(): return "ABORTED"
         
-        # --- 3. Handle Silence (The 10-second Timeout) -> Transition Back to Loop ---
+        # --- 3. Branch A: Silence / Timeout -> Transition Back to Loop ---
         if not user_question:
-            print(">>> [System] 10 seconds of continuous silence detected. Ending interaction.")
+            print(">>> [System] 5 seconds of continuous silence detected. Ending interaction.")
             if state_callback:
-                state_callback(avatar_state="talking.webm", subtitle="Have a nice day!")
-            speak("Have a nice day! I'll go back to the ads now.")
+                state_callback(avatar_state="speaking.webm", subtitle="Have a nice day!")
+            speak("Have a nice day!")
             return "GOTO_LOOP"
             
-        # --- 4. Process Active Speech ---
+        # --- 4. Branch B: Process Active Speech ---
         print(f">>> [User STT Input] {user_question}")
         if state_callback:
-            state_callback(avatar_state="thinking.webm", subtitle=f"Processing: {user_question}")
+            # Change UI to indicate thinking
+            state_callback(avatar_state="thinking.webm", subtitle="Thinking...")
         
-        # --- 5. Generate Hybrid Answer ---
+        # Generate Hybrid Answer using RAG
         answer = get_hybrid_answer(user_question, clean_ad_name)
         
         if is_active_callback and not is_active_callback(): return "ABORTED"
         
-        # --- 6. TTS Output ---
+        # --- 5. TTS Output (Answering) ---
         print(f">>> [System TTS Output] {answer}")
         if state_callback:
-            state_callback(avatar_state="talking.webm", subtitle=answer)
+            state_callback(avatar_state="speaking.webm", subtitle=answer)
         speak(answer)
         
         if is_active_callback and not is_active_callback(): return "ABORTED"
+        
+        # --- 6. TTS Output (Follow-up) ---
         if state_callback:
-            state_callback(avatar_state="listening.webm", subtitle="Anything else?")
+            state_callback(avatar_state="speaking.webm", subtitle="Any other questions?")
+        speak("Any other questions?")
