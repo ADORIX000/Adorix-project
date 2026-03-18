@@ -1,6 +1,7 @@
 import os
 import httpx
 import json
+import asyncio
 from supabase import create_client, Client
 from dotenv import load_dotenv
 
@@ -45,13 +46,13 @@ def save_manifest(manifest):
     except Exception as e:
         print(f"Error saving manifest: {e}")
 
-def sync_ads():
+async def async_sync_ads():
     """
-    Synchronizes ads from Supabase storage to local filesystem.
-    - Uses a manifest to track versions and handle updates of existing files.
-    - Unified path: backend/ads
+    Synchronizes ads from Supabase storage to local filesystem asynchronously.
+    - Uses httpx.AsyncClient for non-blocking downloads.
+    - Uses asyncio.to_thread for synchronous Supabase DB calls.
     """
-    print("Starting Optimized Ad Sync...")
+    print(">>> [STORAGE] Starting Optimized Async Ad Sync...")
     
     # Ensure local directory exists
     if not os.path.exists(LOCAL_ADS_DIR):
@@ -63,40 +64,43 @@ def sync_ads():
 
     # 1. Fetch active ads (filenames and IDs) from Supabase
     try:
-        print("Fetching active ads from database...")
-        # We select video_filename, ad_id (UUID), and description
-        response = supabase.table("ads").select("ad_id, video_filename, description").eq("status", "active").execute()
+        print(">>> [STORAGE] Fetching active ads from database...")
+        # Offload synchronous Supabase request to a thread
+        response = await asyncio.to_thread(
+            lambda: supabase.table("ads").select("ad_id, video_filename, description").eq("status", "active").execute()
+        )
         
         active_filenames = {item['video_filename'] for item in response.data if item.get('video_filename')}
         # Create mapping of filename -> ad_id
         mapping = {item['video_filename']: item['ad_id'] for item in response.data if item.get('video_filename')}
         
-        print(f"Found {len(active_filenames)} active ad(s) in database.")
+        print(f">>> [STORAGE] Found {len(active_filenames)} active ad(s) in database.")
         
         # Save mapping.json
         with open(MAPPING_FILE, "w") as f:
             json.dump(mapping, f, indent=4)
-        print(f"Mapping updated: {MAPPING_FILE}")
-        
+            
     except Exception as e:
-        print(f"Error fetching ads from database: {e}")
+        print(f"[ERROR] [STORAGE] Error fetching ads from database: {e}")
         return
 
     # 2. Get metadata from Supabase Storage to check for updates
     try:
-        print("Fetching storage metadata...")
-        # List all files in the bucket
-        storage_files = supabase.storage.from_("adorix-ads-media").list()
+        print(">>> [STORAGE] Fetching storage metadata...")
+        # Offload synchronous listing to a thread
+        storage_files = await asyncio.to_thread(
+            lambda: supabase.storage.from_("adorix-ads-media").list()
+        )
         # Map filename to its metadata (size/updated_at)
         remote_metadata = {f['name']: f for f in storage_files if f['name'] in active_filenames}
     except Exception as e:
-        print(f"Error listing storage bucket: {e}")
+        print(f"[ERROR] [STORAGE] Error listing storage bucket: {e}")
         return
 
     # 3. Process active files
     for filename in active_filenames:
         if filename not in remote_metadata:
-            print(f"Active ad '{filename}' not found in storage bucket.")
+            print(f">>> [STORAGE] Active ad '{filename}' not found in remote bucket.")
             continue
 
         remote_info = remote_metadata[filename]
@@ -119,23 +123,26 @@ def sync_ads():
             with open(json_path, "w") as f:
                 json.dump(desc_payload, f, indent=4)
         except Exception as e:
-            print(f"Failed to save description for {filename}: {e}")
+            print(f"[ERROR] [STORAGE] Failed to save description for {filename}: {e}")
 
         if needs_download:
             action = "Downloading missing" if not os.path.exists(local_path) else "Updating"
-            print(f"{action} ad: {filename}")
+            print(f">>> [STORAGE] {action} ad: {filename}")
             file_url = f"{STORAGE_BUCKET_URL}/{filename}"
             
             try:
-                with httpx.stream("GET", file_url) as r:
-                    r.raise_for_status()
-                    with open(local_path, "wb") as f:
-                        for chunk in r.iter_bytes():
-                            f.write(chunk)
-                print(f"Successfully synced: {filename}")
+                # Async download ensures the main specific event loop is NOT blocked
+                async with httpx.AsyncClient() as client:
+                    async with client.stream("GET", file_url) as r:
+                        r.raise_for_status()
+                        with open(local_path, "wb") as f:
+                            async for chunk in r.aiter_bytes():
+                                f.write(chunk)
+                                
+                print(f">>> [STORAGE] Successfully synced: {filename}")
                 new_manifest[filename] = remote_version
             except Exception as e:
-                print(f"Failed to sync {filename}: {e}")
+                print(f"[ERROR] [STORAGE] Failed to sync {filename}: {e}")
                 # Keep old version in manifest if download failed but file still exists
                 if os.path.exists(local_path):
                     new_manifest[filename] = local_version
@@ -154,13 +161,27 @@ def sync_ads():
             if local_file not in active_filenames:
                 file_to_delete = os.path.join(LOCAL_ADS_DIR, local_file)
                 if os.path.isfile(file_to_delete):
-                    print(f"Deleting inactive/obsolete ad: {local_file}")
+                    print(f">>> [STORAGE] Deleting inactive/obsolete ad: {local_file}")
                     os.remove(file_to_delete)
     except Exception as e:
-        print(f"Error during cleanup: {e}")
+        print(f"[ERROR] [STORAGE] Error during cleanup: {e}")
 
     save_manifest(new_manifest)
-    print("Sync Complete.")
+    print(">>> [STORAGE] Sync Complete.")
+
+async def start_background_sync(interval_seconds=300):
+    """
+    Infinite loop to be run as an asyncio background task.
+    Gracefully handles all internal errors.
+    """
+    print(">>> [STORAGE] Background sync daemon initialized.")
+    while True:
+        try:
+            await async_sync_ads()
+        except Exception as e:
+            print(f"[ERROR] [STORAGE] Critical failure in background sync loop: {e}")
+            
+        await asyncio.sleep(interval_seconds)
 
 if __name__ == "__main__":
-    sync_ads()
+    asyncio.run(async_sync_ads())

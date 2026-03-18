@@ -26,6 +26,7 @@ from wake_word.wakeword import WakeWordService # Sherpa-ONNX implementation
 from interaction.interaction_manager import start_interaction_loop
 from vision_service import AdorixVision
 from modules.ad_engine.selector import AdSelector
+from modules.storage import start_background_sync
 
 # ═══════════════════════════════════════════════════════════════════════════════
 #  ADORIX ASYNC STATE MACHINE
@@ -235,6 +236,7 @@ class AdorixStateManager:
         print(">>> [S3] Entering INTERACTION MODE")
         self.system_id = 3
         self.avatar_state = "wakeup.webm"
+        session_start_time = time.time()
         
         # Stop wake word engine so STT can use the microphone
         self._stop_wake_word()
@@ -259,6 +261,11 @@ class AdorixStateManager:
             except asyncio.TimeoutError: pass
 
         print(">>> [S3] Conversation ended. Returning to S1.")
+        
+        # Track analytics for the total duration of the conversation
+        watch_time = int(time.time() - session_start_time)
+        asyncio.create_task(self._push_analytics(self.ad_url, watch_time, engage_count=1))
+        
         self.system_id = 1
         self.avatar_state = "HIDDEN"
         self.ad_url = self.ad_selector.get_next_idle_ad()
@@ -280,6 +287,9 @@ manager = AdorixStateManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ignite the Background Cloud Sync Daemon
+    asyncio.create_task(start_background_sync(interval_seconds=300))
+    
     rules_path = os.path.join(current_dir, "modules", "ad_engine", "rules.json")
     selector = AdSelector(rules_path, ads_dir)
     manager.set_ad_selector(selector)
