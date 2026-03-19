@@ -268,21 +268,40 @@ manager = AdorixStateManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Ignite the Background Cloud Sync Daemon
+    print("LIFESPAN: Starting...")
     asyncio.create_task(start_background_sync(interval_seconds=300))
+    print("LIFESPAN: Background sync task created.")
     
     rules_path = os.path.join(current_dir, "modules", "ad_engine", "rules.json")
     selector = AdSelector(rules_path, ads_dir)
+    print("LIFESPAN: Ad selector initialized.")
     manager.set_ad_selector(selector)
+    print("LIFESPAN: Manager ad selector set.")
     asyncio.create_task(manager.run())
+    print("LIFESPAN: Manager run task created.")
     
-    manager.vision_service = AdorixVision(broadcast_callback=manager.on_vision_update, selector=selector)
-    threading.Thread(target=manager.vision_service.start, daemon=True).start()
+    print("LIFESPAN: Initializing AdorixVision...")
+    try:
+        manager.vision_service = AdorixVision(broadcast_callback=manager.on_vision_update, selector=selector)
+        print("LIFESPAN: AdorixVision initialized, starting thread...")
+        threading.Thread(target=manager.vision_service.start, daemon=True).start()
+        print("LIFESPAN: Thread started. Yielding to uvicorn...")
+    except Exception as vision_err:
+        print(f"LIFESPAN: ERROR starting AdorixVision: {vision_err}")
     yield
+    print("LIFESPAN: Shutting down...")
     manager._stop_wake_word()
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+
+from fastapi import Request
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    # print(f"MIDDLEWARE: Received request {request.method} {request.url}")
+    response = await call_next(request)
+    # print(f"MIDDLEWARE: Returning response {response.status_code}")
+    return response
 
 if os.path.exists(ads_dir):
     app.mount("/ads", StaticFiles(directory=ads_dir), name="ads")

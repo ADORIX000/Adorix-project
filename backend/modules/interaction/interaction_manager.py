@@ -12,8 +12,15 @@ from .stt_engine import listen_one_phrase
 from product_qa_engine import ProductQAEngine
 from modules.interaction.brain_engine import adorix_brain
 
-# Initialize globally so the JSON database loads only once
-qa_engine = ProductQAEngine()
+# Lazy-load the QA Engine to avoid import-time hangs and circular issues
+_qa_engine = None
+
+def get_qa_engine():
+    global _qa_engine
+    if _qa_engine is None:
+        print(">>> [Interaction] Initializing ProductQAEngine for the first time...")
+        _qa_engine = ProductQAEngine()
+    return _qa_engine
 
 def get_hybrid_answer(question: str, clean_ad_name: str) -> str:
     """
@@ -21,7 +28,8 @@ def get_hybrid_answer(question: str, clean_ad_name: str) -> str:
     If it fails to find a good match, falls back to BrainEngine (TinyLlama).
     """
     print(f">>> [Hybrid QA] Attempting EXACT MATCH for: '{question}'")
-    answer = qa_engine.get_answer(question, clean_ad_name)
+    engine = get_qa_engine()
+    answer = engine.get_answer(question, clean_ad_name)
     
     # If the QA Engine couldn't find an exact match, it returns its fallback string.
     # We intercept that and use the BrainEngine instead.
