@@ -5,11 +5,14 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {
-      animation: {
-        'slow-pulse': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-      }
-    },
+      extend: {
+        colors: {
+          'adorix-blue': '#00b8ff',
+        },
+        animation: {
+          'slow-pulse': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        }
+      },
   },
   plugins: [],
 }

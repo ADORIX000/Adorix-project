@@ -1,4 +1,3 @@
-import React from 'react';
 export default function LiveStatus({ isConnected }) {
   return (
     <div className="absolute top-8 right-8 z-50 flex items-center gap-3 bg-black/50 backdrop-blur-md px-5 py-2.5 rounded-full border border-white/10 shadow-lg">

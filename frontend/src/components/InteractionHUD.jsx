@@ -1,4 +1,3 @@
-import React from 'react';
 export default function InteractionHUD({ showMic }) {
   return (
     <div className="absolute bottom-16 w-full flex flex-col items-center justify-center z-40 transition-opacity duration-500">

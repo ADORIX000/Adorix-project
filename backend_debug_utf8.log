@@ -1,0 +1,100 @@
+﻿334.76it/s, 
+Materializing param=mod
+el.layers.21.self_attn.
+o_proj.weight]
+Loading weights:  
+99%|#########8| 
+198/201 [00:00<00:00, 
+334.76it/s, 
+Materializing param=mod
+el.layers.21.self_attn.
+o_proj.weight]
+Loading weights:  
+99%|#########9| 
+199/201 [00:00<00:00, 
+334.76it/s, 
+Materializing param=mod
+el.layers.21.self_attn.
+q_proj.weight]
+Loading weights:  
+99%|#########9| 
+199/201 [00:00<00:00, 
+334.76it/s, 
+Materializing param=mod
+el.layers.21.self_attn.
+q_proj.weight]
+Loading weights: 
+100%|#########9| 
+200/201 [00:00<00:00, 
+334.76it/s, 
+Materializing param=mod
+el.layers.21.self_attn.
+v_proj.weight]
+Loading weights: 
+100%|#########9| 
+200/201 [00:00<00:00, 
+334.76it/s, 
+Materializing param=mod
+el.layers.21.self_attn.
+v_proj.weight]
+Loading weights: 
+100%|##########| 
+201/201 [00:00<00:00, 
+334.76it/s, 
+Materializing param=mod
+el.norm.weight]        
+              
+Loading weights: 
+100%|##########| 
+201/201 [00:00<00:00, 
+334.76it/s, 
+Materializing param=mod
+el.norm.weight]
+Loading weights: 
+100%|##########| 
+201/201 [00:00<00:00, 
+340.38it/s, 
+Materializing param=mod
+el.norm.weight]
+INFO:     Started 
+server process [10040]
+INFO:     Waiting for 
+application startup.
+INFO:     Application 
+startup complete.
+ERROR:    [Errno 
+10048] error while 
+attempting to bind on 
+address ('0.0.0.0', 
+8001): [winerror 
+10048] only one usage 
+of each socket address 
+(protocol/network 
+address/port) is 
+normally permitted
+INFO:     Waiting for 
+application shutdown.
+INFO:     Application 
+shutdown complete.
+[Brain] AI Engine loaded successfully.
+Loading product database...
+Loaded 12 products
+Loading product database...
+Loaded 12 products
+
+============================================================
+  ADORIX BACKEND ù INITIALIZING
+============================================================
+
+[VISION] Loading models from C:\Users\deegh\OneDrive\Desktop\DEE\GitHUB\Adorix-project\backend\modules\vision\models...
+[VISION] Models loaded successfully.
+[VISION] Starting camera capture...
+Starting Optimized Ad Sync...
+
+============================================================
+  ADORIX STATE MACHINE ù ONLINE
+============================================================
+
+>>> [S1] Entering LOOP MODE
+>>> [System] Shutdown complete.
+Fetching active ads from database...
