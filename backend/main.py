@@ -33,6 +33,8 @@ from modules.storage import start_background_sync
 # ═══════════════════════════════════════════════════════════════════════════════
 class AdorixStateManager:
 
+    MAX_PLAY_COUNT   = 2          # Limit personalized ad to exactly 2 plays
+    COOLDOWN_SECONDS = 10         # Prevent rapid re-triggering after exiting State 2
     INTERACTION_TIMEOUT = 180.0   # Allow up to 3 minutes for a conversation
 
     def __init__(self):
@@ -41,6 +43,8 @@ class AdorixStateManager:
         self.avatar_state = "HIDDEN"
         self.subtitle     = ""
         self.ad_url       = ""
+        self.play_count   = 0
+        self.last_timeout_time = 0.0
 
         self.command_queue   = asyncio.Queue()
         self.wake_word_event = asyncio.Event()
@@ -140,6 +144,10 @@ class AdorixStateManager:
             if msg.get("type") == "VISION":
                 data = msg.get("data", {})
                 if data.get("system_id") == 2:
+                    # Enforce Cooldown: Don't rapidly re-trigger if someone is lingering
+                    if (time.time() - self.last_timeout_time) < self.COOLDOWN_SECONDS:
+                        continue
+                        
                     # ── Face Detected: Perform State Transition ──
                     self.system_id = 2  # Transition to Personalized Mode
                     self.ad_url = data.get("ad_url", "")
@@ -159,6 +167,7 @@ class AdorixStateManager:
     async def _state_personalized(self):
         print(f">>> [S2] Entering PERSONALIZED MODE (ad={self.ad_url})")
         self.system_id = 2
+        self.play_count = 0
         session_start_time = time.time()
         
         self.wake_word_event.clear()
@@ -185,13 +194,18 @@ class AdorixStateManager:
 
             # ── Priority 2: Ad Ended without wake word ──
             if msg.get("type") == "AD_ENDED":
-                print(f">>> [S2] Ad finished. No wake word. Back to S1.")
-                watch_time = int(time.time() - session_start_time)
-                asyncio.create_task(self._push_analytics(self.ad_url, watch_time, engage_count=0))
-                
-                self.system_id = 1
-                self._stop_wake_word()
-                return
+                self.play_count += 1
+                if self.play_count >= self.MAX_PLAY_COUNT:
+                    print(f">>> [S2] Played {self.MAX_PLAY_COUNT} times. No wake word. Back to S1.")
+                    watch_time = int(time.time() - session_start_time)
+                    asyncio.create_task(self._push_analytics(self.ad_url, watch_time, engage_count=0))
+                    
+                    self.last_timeout_time = time.time()
+                    self.system_id = 1
+                    self._stop_wake_word()
+                    return
+                else:
+                    await self.broadcast_state() # Play next loop
 
     async def _push_analytics(self, ad_id: str, watch_time: int, engage_count: int):
         """Dummy helper to format and print Supabase payload without blocking."""
