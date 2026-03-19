@@ -11,9 +11,18 @@ export default function App() {
   const [activeAd, setActiveAd] = useState('10-15_female.mp4');
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
   const [subtitle, setSubtitle] = useState("");
+  const [offlineIndex, setOfflineIndex] = useState(0);
+
+  // Fallback playlist when backend is offline
+  const fallbackAds = [
+    '10-15_female.mp4', '10-15_male.mp4', 
+    '16-29_female.mp4', '16-29_male.mp4', 
+    '30-39_female.mp4', '40-49_female.mp4', '40-49_male.mp4', 
+    '50-59_female.mp4', '50-59_male.mp4', 'above-60_female.mp4', 'above-60_male.mp4'
+  ];
   
   // Connect directly to the backend on port 8002 to ensure robust WebSocket communication
-  const { lastMessage, sendJsonMessage } = useSocket('ws://localhost:8002/ws');
+  const { lastMessage, isConnected, sendJsonMessage } = useSocket('ws://localhost:8002/ws');
 
   // Sync state seamlessly from backend
   useEffect(() => {
@@ -25,6 +34,17 @@ export default function App() {
     }
   }, [lastMessage]);
 
+  const handleAdEnded = () => {
+    if (isConnected) {
+      sendJsonMessage({ type: "AD_ENDED" });
+    } else {
+      // Offline fallback rotation
+      const nextIndex = (offlineIndex + 1) % fallbackAds.length;
+      setOfflineIndex(nextIndex);
+      setActiveAd(fallbackAds[nextIndex]);
+    }
+  };
+
   return (
     <div className="w-screen h-screen bg-black overflow-hidden relative">
       {/* 1. Dynamic Stage Rendering based on State Machine */}
@@ -32,7 +52,7 @@ export default function App() {
         <LoopView 
             key="loop"
             adUrl={activeAd} 
-            onEnded={() => sendJsonMessage({ type: "AD_ENDED" })} 
+            onEnded={handleAdEnded} 
         />
       )}
       {systemId === 2 && (
