@@ -146,29 +146,38 @@ class AdorixVision:
             self.is_analyzing = False
 
     def start(self):
-        print("[VISION] Starting camera capture...")
+        """Main loop for face detection and demographic analysis."""
         cap = None
         
-        # Try different indices and backends if the first fail (Windows MSMF issues)
-        for index in [0, 1]:
-            for backend in [None, cv2.CAP_DSHOW]:
+        # Windows: CAP_DSHOW is often much more stable than the default MSMF (700)
+        # Try CAP_DSHOW first, then fallback to default.
+        backends = [cv2.CAP_DSHOW, None]
+        
+        for index in [0, 1, 2]:
+            for backend in backends:
                 try:
-                    if backend:
+                    if backend is not None:
                         cap = cv2.VideoCapture(index + backend)
                     else:
                         cap = cv2.VideoCapture(index)
                     
                     if cap.isOpened():
-                        # Quick test grab
+                        # Set resolution if possible to stabilize
+                        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+                        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                        
                         ret, test_frame = cap.read()
                         if ret:
-                            print(f"[VISION] Successfully opened camera at index {index} with backend {backend}")
+                            backend_name = "DSHOW" if backend == cv2.CAP_DSHOW else "DEFAULT/MSMF"
+                            print(f"[VISION] Successfully opened camera {index} with {backend_name} backend")
                             break
                         else:
                             cap.release()
+                    else:
+                        cap.release()
                 except Exception as e:
-                    print(f"[VISION] Failed index {index} backend {backend}: {e}")
-            if cap and cap.isOpened(): 
+                    pass
+            if cap and cap.isOpened():
                 break
 
         if not cap or not cap.isOpened():
@@ -184,6 +193,7 @@ class AdorixVision:
                     bboxes = self.detect_faces(frame)
                     
                     if bboxes:
+                        # print(f"[DEBUG] Faces found: {len(bboxes)}")
                         # 1. START THE CLOCK
                         if self.buffer_start_time is None:
                             self.buffer_start_time = time.time()
@@ -205,6 +215,7 @@ class AdorixVision:
                                 ad_name = self.selector.get_personalized_ad(unique_winners[0])
                                 
                                 # Broadcast the findings to React
+                                print(f"[DEBUG] Vision Service Broadcasting: ID=2, Demos={unique_winners}")
                                 self.broadcast({
                                     "system_id": 2, 
                                     "ad_url": ad_name,

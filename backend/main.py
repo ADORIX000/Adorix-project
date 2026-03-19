@@ -85,9 +85,12 @@ class AdorixStateManager:
             asyncio.run_coroutine_threadsafe(self.broadcast_state(), self.main_loop)
 
     def on_vision_update(self, data: dict):
+        # print(f"[DEBUG] on_vision_update received: {data}")
         if self.main_loop and not self.main_loop.is_closed():
             asyncio.run_coroutine_threadsafe(
                 self.command_queue.put({"type": "VISION", "data": data}), self.main_loop)
+        else:
+            print("[WARN] on_vision_update: main_loop not ready or closed!")
 
     def on_wake_word(self):
         print("\n!!! [S2] Wake Word Detected !!!")
@@ -118,6 +121,7 @@ class AdorixStateManager:
         print("=" * 60 + "\n")
         
         while True:
+            # print(f"[DEBUG] Heartbeat. System ID: {self.system_id}")
             if self.system_id == 1: await self._state_loop()
             elif self.system_id == 2: await self._state_personalized()
             elif self.system_id == 3: await self._state_interaction()
@@ -151,13 +155,22 @@ class AdorixStateManager:
                         
                     demographics = data.get("demographics", [])
                     if demographics:
-                        self.personalized_playlist = self.ad_selector.get_playlist_for_demographics(demographics)
-                        self.playlist_index = 0
-                        self.ad_url = self.personalized_playlist[self.playlist_index]
-                        self.last_vision_time = time.time()
-                        
-                        self.system_id = 2
-                        return
+                        try:
+                            playlist = self.ad_selector.get_playlist_for_demographics(demographics)
+                        except Exception as e:
+                            print(f"[ERROR] get_playlist_for_demographics failed: {e}")
+                            playlist = []
+                            
+                        if playlist:
+                            self.personalized_playlist = playlist
+                            self.playlist_index = 0
+                            self.ad_url = self.personalized_playlist[self.playlist_index]
+                            self.last_vision_time = time.time()
+                            
+                            self.system_id = 2
+                            return
+                        else:
+                            print(f"[WARN] No ads found for demographics: {demographics}")
 
             elif msg.get("type") == "AD_ENDED":
                 self.ad_url = self.ad_selector.get_next_idle_ad()
@@ -294,11 +307,15 @@ async def lifespan(app: FastAPI):
     print("LIFESPAN: Initializing AdorixVision...")
     try:
         manager.vision_service = AdorixVision(broadcast_callback=manager.on_vision_update, selector=selector)
-        print("LIFESPAN: AdorixVision initialized, starting thread...")
+        print("LIFESPAN: AdorixVision initialized successfully.")
+        
+        print("LIFESPAN: Starting AdorixVision thread...")
         threading.Thread(target=manager.vision_service.start, daemon=True).start()
-        print("LIFESPAN: Thread started. Yielding to uvicorn...")
+        print("LIFESPAN: AdorixVision thread started.")
     except Exception as vision_err:
         print(f"LIFESPAN: ERROR starting AdorixVision: {vision_err}")
+        import traceback
+        traceback.print_exc()
     yield
     print("LIFESPAN: Shutting down...")
     manager._stop_wake_word()
