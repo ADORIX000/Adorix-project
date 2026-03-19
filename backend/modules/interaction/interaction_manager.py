@@ -49,7 +49,7 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
     time.sleep(2.5)
     
     if state_callback:
-        state_callback(avatar_state="speaking.webm", subtitle="Hello! Do you have any questions about this ad?")
+        state_callback(avatar_state="talking.webm", subtitle="Hello! Do you have any questions about this ad?")
         
     speak("Hello! Do you have any questions about this ad?")
     
@@ -69,7 +69,7 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
         if not user_question:
             print(">>> [System] 5 seconds of continuous silence detected. Ending interaction.")
             if state_callback:
-                state_callback(avatar_state="speaking.webm", subtitle="Have a nice day!")
+                state_callback(avatar_state="talking.webm", subtitle="Have a nice day!")
             speak("Have a nice day!")
             return "GOTO_LOOP"
             
@@ -87,12 +87,12 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
         # --- 5. TTS Output (Answering) ---
         print(f">>> [System TTS Output] {answer}")
         if state_callback:
-            state_callback(avatar_state="speaking.webm", subtitle=answer)
+            state_callback(avatar_state="talking.webm", subtitle=answer)
         speak(answer)
         
         if is_active_callback and not is_active_callback(): return "ABORTED"
         
         # --- 6. TTS Output (Follow-up) ---
         if state_callback:
-            state_callback(avatar_state="speaking.webm", subtitle="Any other questions?")
+            state_callback(avatar_state="talking.webm", subtitle="Any other questions?")
         speak("Any other questions?")

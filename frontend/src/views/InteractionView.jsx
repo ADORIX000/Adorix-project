@@ -3,7 +3,7 @@ import AvatarOverlay from '../avatar/AvatarOverlay';
 import { Mic } from 'lucide-react';
 import { AVATAR_STATES } from '../avatar/avatarStates';
 
-export default function InteractionView({ adUrl, avatarState, setAvatarState }) {
+export default function InteractionView({ adUrl, avatarState, setAvatarState, subtitle }) {
   // Determine if the AI is actively listening to the user
   // (If she is IDLE, it means she is waiting for the user to speak)
   const isListening = avatarState === AVATAR_STATES.IDLE;
@@ -48,6 +48,19 @@ export default function InteractionView({ adUrl, avatarState, setAvatarState }) 
       <div className="absolute inset-0 z-50 pointer-events-none">
         <AvatarOverlay avatarState={avatarState} setAvatarState={setAvatarState} />
       </div>
+
+      {/* ========================================== */}
+      {/* 4. THE SUBTITLES OVERLAY */}
+      {/* ========================================== */}
+      {subtitle && (
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-3/4 max-w-4xl z-50 text-center pointer-events-none">
+          <div className="bg-black/60 backdrop-blur-md px-8 py-4 rounded-2xl border border-white/10 shadow-2xl inline-block">
+            <p className="text-white text-2xl md:text-3xl font-medium tracking-wide leading-relaxed drop-shadow-md">
+              {subtitle}
+            </p>
+          </div>
+        </div>
+      )}
 
     </div>
   );

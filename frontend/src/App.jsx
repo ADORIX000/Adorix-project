@@ -10,6 +10,7 @@ export default function App() {
   const [systemId, setSystemId] = useState(1);
   const [activeAd, setActiveAd] = useState('10-15_female.mp4');
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
+  const [subtitle, setSubtitle] = useState("");
   
   // Connect directly to the backend on port 8002 to ensure robust WebSocket communication
   const { lastMessage, sendJsonMessage } = useSocket('ws://localhost:8002/ws');
@@ -20,6 +21,7 @@ export default function App() {
       if (lastMessage.system_id) setSystemId(lastMessage.system_id);
       if (lastMessage.ad_url) setActiveAd(lastMessage.ad_url);
       if (lastMessage.avatar_state) setAvatarState(lastMessage.avatar_state);
+      if (lastMessage.subtitle !== undefined) setSubtitle(lastMessage.subtitle);
     }
   }, [lastMessage]);
 
@@ -46,7 +48,8 @@ export default function App() {
           key="interaction"
           adUrl={activeAd} 
           avatarState={avatarState} 
-          setAvatarState={setAvatarState} 
+          setAvatarState={setAvatarState}
+          subtitle={subtitle}
         />
       )}
 
