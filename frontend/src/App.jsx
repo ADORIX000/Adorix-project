@@ -4,6 +4,7 @@ import { AVATAR_STATES } from './avatar/avatarStates';
 import LoopView from './views/LoopView';
 import PersonalizedView from './views/PersonalizedView';
 import InteractionView from './views/InteractionView';
+import DebugCard from './components/DebugCard';
 
 export default function App() {
   console.log("App: Component Rendering");
@@ -79,6 +80,8 @@ export default function App() {
         <video src="/avatar-videos/listening.webm" preload="auto" muted />
         <video src="/avatar-videos/talking.webm" preload="auto" muted />
       </div>
+
+      <DebugCard systemId={systemId} isConnected={isConnected} />
 
       {/* DEBUG BUTTON: Manually trigger wake word in State 2 */}
       {systemId === 2 && (

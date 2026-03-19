@@ -48,7 +48,8 @@ class AdorixVision:
 
         self.MODEL_MEAN_VALUES = (78.4263377603, 87.7689143744, 114.895847746)
         self.AGE_LIST = ['(10-15)', '(16-29)', '(30-39)', '(40-49)', '(50-59)', '(60-100)']
-        self.GENDER_LIST = ['Male', 'Female']
+        # Assuming the model outputs 0 for Female, 1 for Male which is common if male ads appeared for females
+        self.GENDER_LIST = ['Female', 'Male']
 
     def map_to_group(self, age_idx, gender_pred):
         """Translates raw AI data into Adorix predefined format."""
@@ -56,8 +57,8 @@ class AdorixVision:
         
         if age_idx <= 2: age_group = "10-15"
         elif age_idx == 3: age_group = "16-29"
-        elif age_idx == 4: age_group = "16-29"
-        elif age_idx == 5: age_group = "30-39"
+        elif age_idx == 4: age_group = "30-39"
+        elif age_idx == 5: age_group = "40-49"
         elif age_idx == 6: age_group = "50-59"
         else: age_group = "above-60"
             
