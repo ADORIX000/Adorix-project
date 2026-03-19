@@ -33,8 +33,6 @@ from modules.storage import start_background_sync
 # ═══════════════════════════════════════════════════════════════════════════════
 class AdorixStateManager:
 
-    MAX_PLAY_COUNT   = 2          # Limit personalized ad to exactly 2 plays
-    COOLDOWN_SECONDS = 10         # Prevent rapid re-triggering after exiting State 2
     INTERACTION_TIMEOUT = 180.0   # Allow up to 3 minutes for a conversation
 
     def __init__(self):
@@ -43,8 +41,6 @@ class AdorixStateManager:
         self.avatar_state = "HIDDEN"
         self.subtitle     = ""
         self.ad_url       = ""
-        self.play_count   = 0
-        self.last_timeout_time = 0.0
 
         self.command_queue   = asyncio.Queue()
         self.wake_word_event = asyncio.Event()
@@ -144,14 +140,9 @@ class AdorixStateManager:
             if msg.get("type") == "VISION":
                 data = msg.get("data", {})
                 if data.get("system_id") == 2:
-                    # Enforce Cooldown: Don't rapidly re-trigger if someone is lingering
-                    if (time.time() - self.last_timeout_time) < self.COOLDOWN_SECONDS:
-                        continue
-                        
                     # ── Face Detected: Perform State Transition ──
                     self.system_id = 2  # Transition to Personalized Mode
                     self.ad_url = data.get("ad_url", "")
-                    self.play_count = 0
                     
                     # Return out of this function to allow the main dispatcher (`run`) 
                     # to route to `_state_personalized()`
@@ -168,7 +159,6 @@ class AdorixStateManager:
     async def _state_personalized(self):
         print(f">>> [S2] Entering PERSONALIZED MODE (ad={self.ad_url})")
         self.system_id = 2
-        self.play_count = 0
         session_start_time = time.time()
         
         self.wake_word_event.clear()
@@ -193,30 +183,15 @@ class AdorixStateManager:
             except asyncio.TimeoutError:
                 continue
 
-            # ── Priority 2: Vision Lost (User Walked Away) ──
-            if msg.get("type") == "VISION" and msg.get("data", {}).get("system_id") == 1:
-                print(">>> [S2] Vision lost. User walked away. Back to S1.")
+            # ── Priority 2: Ad Ended without wake word ──
+            if msg.get("type") == "AD_ENDED":
+                print(f">>> [S2] Ad finished. No wake word. Back to S1.")
                 watch_time = int(time.time() - session_start_time)
                 asyncio.create_task(self._push_analytics(self.ad_url, watch_time, engage_count=0))
                 
                 self.system_id = 1
                 self._stop_wake_word()
                 return
-
-            # ── Priority 3: Ad Loop Limit Reached ──
-            if msg.get("type") == "AD_ENDED":
-                self.play_count += 1
-                if self.play_count >= self.MAX_PLAY_COUNT:
-                    print(f">>> [S2] Played {self.MAX_PLAY_COUNT} times. No wake word. Back to S1.")
-                    watch_time = int(time.time() - session_start_time)
-                    asyncio.create_task(self._push_analytics(self.ad_url, watch_time, engage_count=0))
-                    
-                    self.last_timeout_time = time.time()
-                    self.system_id = 1
-                    self._stop_wake_word()
-                    return
-                else:
-                    await self.broadcast_state() # Play next loop
 
     async def _push_analytics(self, ad_id: str, watch_time: int, engage_count: int):
         """Dummy helper to format and print Supabase payload without blocking."""
@@ -246,19 +221,11 @@ class AdorixStateManager:
         loop = asyncio.get_running_loop()
         future = loop.run_in_executor(None, self._run_interaction_sync, self.ad_url)
 
-        # Monitor for walk-aways during the conversation
-        while not future.done():
-            try: msg = await asyncio.wait_for(self.command_queue.get(), timeout=0.5)
-            except asyncio.TimeoutError: continue
-            
-            # If user completely leaves the camera frame during chat
-            if msg.get("type") == "VISION" and msg["data"].get("system_id") == 1:
-                self._interaction_abort.set()
-                break
-
-        if not future.done():
-            try: await asyncio.wait_for(asyncio.shield(future), timeout=self.INTERACTION_TIMEOUT)
-            except asyncio.TimeoutError: pass
+        try: 
+            await asyncio.wait_for(future, timeout=self.INTERACTION_TIMEOUT)
+        except asyncio.TimeoutError: 
+            print(">>> [S3] Interaction timeout reached. Aborting.")
+            self._interaction_abort.set()
 
         print(">>> [S3] Conversation ended. Returning to S1.")
         
