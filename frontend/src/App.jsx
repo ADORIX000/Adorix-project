@@ -13,20 +13,31 @@ export default function App() {
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
   const [subtitle, setSubtitle] = useState("");
   const [offlineIndex, setOfflineIndex] = useState(0);
-
-  // Fallback playlist when backend is offline
-  const fallbackAds = [
+  const [playlist, setPlaylist] = useState([
     '10-15_female.mp4', '10-15_male.mp4', 
     '16-29_female.mp4', '16-29_male.mp4', 
     '30-39_female.mp4', '40-49_female.mp4', '40-49_male.mp4', 
     '50-59_female.mp4', '50-59_male.mp4', 'above-60_female.mp4', 'above-60_male.mp4'
-  ];
+  ]);
   
   // Connect directly to the backend on port 8002 to ensure robust WebSocket communication
   const { lastMessage, isConnected, sendJsonMessage } = useSocket('ws://localhost:8002/ws');
 
   // Sync state seamlessly from backend
   useEffect(() => {
+    // Fetch external ad playlist to keep offline fallback dynamic
+    fetch('http://localhost:8002/api/ads')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          console.log("App: Synced external playlist", data);
+          setPlaylist(data);
+          // Auto-start with the first ad if we are fresh
+          if (!lastMessage) setActiveAd(data[0]);
+        }
+      })
+      .catch(err => console.warn("App: Dynamic playlist fetch failed (Backend might be starting up). Using defaults."));
+
     if (lastMessage) {
       if (lastMessage.system_id) setSystemId(lastMessage.system_id);
       if (lastMessage.ad_url) setActiveAd(lastMessage.ad_url);
@@ -39,10 +50,10 @@ export default function App() {
     if (isConnected) {
       sendJsonMessage({ type: "AD_ENDED" });
     } else {
-      // Offline fallback rotation
-      const nextIndex = (offlineIndex + 1) % fallbackAds.length;
+      // Offline fallback rotation using dynamic playlist
+      const nextIndex = (offlineIndex + 1) % playlist.length;
       setOfflineIndex(nextIndex);
-      setActiveAd(fallbackAds[nextIndex]);
+      setActiveAd(playlist[nextIndex]);
     }
   };
 

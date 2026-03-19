@@ -1,9 +1,19 @@
-
+import os
 import cv2
 import time
 import sys
 import threading
+
+# --- Path Setup ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+modules_dir = os.path.join(current_dir, 'modules')
+if modules_dir not in sys.path:
+    sys.path.append(modules_dir)
+
 from vision_service import AdorixVision
+from modules.ad_engine.selector import AdSelector
 
 # Mock callback to print broadcast messages
 def mock_broadcast(data):
@@ -15,20 +25,12 @@ def mock_broadcast(data):
     elif sid == 2:
         demo_list = data.get("demographics", [])
         ad = data.get("ad_url", "N/A")
+        is_multi = data.get("all_people", False)
         
         print("\n" + "="*50)
-        print(" FINAL ANALYSIS WINNER (2-Second Window)")
-        
-        for demo in demo_list:
-            # Parse "16-29_male" -> "16-29" and "male"
-            parts = demo.split("_")
-            age = parts[0] if len(parts) > 0 else "Unknown"
-            gender = parts[1].capitalize() if len(parts) > 1 else "Unknown"
-            
-            print(f"Detected: {gender}")
-            print(f"Age Group: {age}")
-            print(f"Assigned Ad: {ad}")
-            
+        print(f" ANALYSIS RESULT ({'MULTI' if is_multi else 'SINGLE'})")
+        print(f" All Detected: {demo_list}")
+        print(f" Currently Playing Ad: {ad}")
         print("="*50 + "\n")
 
 def run_test():
@@ -41,7 +43,13 @@ def run_test():
     
     # Initialize Service
     try:
-        service = AdorixVision(mock_broadcast)
+        # Dummy paths for testing
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        rules_path = os.path.join(current_dir, "modules", "ad_engine", "rules.json")
+        ads_dir = os.path.join(current_dir, "ads")
+        selector = AdSelector(rules_path, ads_dir)
+        
+        service = AdorixVision(mock_broadcast, selector=selector)
     except Exception as e:
         print(f"[ERROR] Failed to initialize AdorixVision: {e}")
         return

@@ -196,20 +196,20 @@ class AdorixVision:
                         # 3. THE 2-SECOND EVALUATION
                         if time.time() - self.buffer_start_time >= 2.0:
                             if self.detection_buffer:
-                                # Count the list and get the #1 most frequent value
-                                most_common_tuple = Counter(self.detection_buffer).most_common(1)
-                                winning_demographic = most_common_tuple[0][0]
+                                # Instead of a single winner, get all unique demographics
+                                unique_winners = list(set(self.detection_buffer))
                                 
-                                print(f"\n[WINNER] 2-Sec Analysis complete: {winning_demographic}")
+                                print(f"\n[ANALYSIS] 2-Sec Window Complete. Detected: {unique_winners}")
                                 
-                                # Select the ad using the selector
-                                ad_name = self.selector.get_personalized_ad(winning_demographic)
+                                # Select the first ad in the list (main.py will handle rotation if needed)
+                                ad_name = self.selector.get_personalized_ad(unique_winners[0])
                                 
-                                # Broadcast the winner to React with system_id: 2 (Personalized Mode)
+                                # Broadcast the findings to React
                                 self.broadcast({
                                     "system_id": 2, 
                                     "ad_url": ad_name,
-                                    "demographics": [winning_demographic]
+                                    "demographics": unique_winners, # Send the full list
+                                    "all_people": True # Flag to indicate multi-person analysis
                                 })
                             
                             # Reset the clock so it continues to evaluate every 2 seconds

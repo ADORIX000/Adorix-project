@@ -46,6 +46,11 @@ class AdorixStateManager:
         self.play_count   = 0
         self.last_timeout_time = 0.0
 
+        # Multi-person / Playlist support
+        self.personalized_playlist = []
+        self.playlist_index = 0
+        self.last_vision_time = 0.0
+
         self.command_queue   = asyncio.Queue()
         self.wake_word_event = asyncio.Event()
         self._interaction_abort = threading.Event()
@@ -125,15 +130,12 @@ class AdorixStateManager:
         print(">>> [S1] Entering LOOP MODE")
         self.system_id = 1
         self.avatar_state = "HIDDEN"
-        self._stop_wake_word()  # Stop the wake word engine to free up hardware (CPU/Mic)
+        self._stop_wake_word()
 
-        # Get the next idle ad for continuous playback
         self.ad_url = self.ad_selector.get_next_idle_ad()
         await self.broadcast_state()
 
-        # Clear the queue of any stale commands before we begin the loop
-        while not self.command_queue.empty(): 
-            self.command_queue.get_nowait()
+        while not self.command_queue.empty(): self.command_queue.get_nowait()
 
         while self.system_id == 1:
             try: 
@@ -144,20 +146,20 @@ class AdorixStateManager:
             if msg.get("type") == "VISION":
                 data = msg.get("data", {})
                 if data.get("system_id") == 2:
-                    # Enforce Cooldown: Don't rapidly re-trigger if someone is lingering
                     if (time.time() - self.last_timeout_time) < self.COOLDOWN_SECONDS:
                         continue
                         
-                    # ── Face Detected: Perform State Transition ──
-                    self.system_id = 2  # Transition to Personalized Mode
-                    self.ad_url = data.get("ad_url", "")
-                    
-                    # Return out of this function to allow the main dispatcher (`run`) 
-                    # to route to `_state_personalized()`
-                    return
+                    demographics = data.get("demographics", [])
+                    if demographics:
+                        self.personalized_playlist = self.ad_selector.get_playlist_for_demographics(demographics)
+                        self.playlist_index = 0
+                        self.ad_url = self.personalized_playlist[self.playlist_index]
+                        self.last_vision_time = time.time()
+                        
+                        self.system_id = 2
+                        return
 
             elif msg.get("type") == "AD_ENDED":
-                # Continuous Playlist: Get next ad and broadcast instantly
                 self.ad_url = self.ad_selector.get_next_idle_ad()
                 await self.broadcast_state()
 
@@ -165,26 +167,30 @@ class AdorixStateManager:
     #  STATE 2 — PERSONALIZED MODE
     # ══════════════════════════════════════════════════════════════════════════
     async def _state_personalized(self):
-        print(f">>> [S2] Entering PERSONALIZED MODE (ad={self.ad_url})")
+        print(f">>> [S2] Entering PERSONALIZED MODE (Playlist: {self.personalized_playlist})")
         self.system_id = 2
         self.play_count = 0
         session_start_time = time.time()
         
         self.wake_word_event.clear()
-        self._start_wake_word() # Boot Sherpa-ONNX in background
+        self._start_wake_word()
         await self.broadcast_state()
 
         while not self.command_queue.empty(): self.command_queue.get_nowait()
 
         while self.system_id == 2:
-            # ── Priority 1: Check for Wake Word First ──
             if self.wake_word_event.is_set():
-                print(">>> [S2] Wake word detected! Transitioning to S3")
+                print(">>> [S2] Wake word detected!")
                 watch_time = int(time.time() - session_start_time)
-                # Fire background analytics task without blocking
                 asyncio.create_task(self._push_analytics(self.ad_url, watch_time, engage_count=1))
-                
                 self.system_id = 3
+                return
+
+            if time.time() - self.last_vision_time > 5.0:
+                print(">>> [S2] No vision detection for 5s. Returning to S1.")
+                self.last_timeout_time = time.time()
+                self.system_id = 1
+                self._stop_wake_word()
                 return
 
             try: 
@@ -192,20 +198,25 @@ class AdorixStateManager:
             except asyncio.TimeoutError:
                 continue
 
-            # ── Priority 2: Ad Ended without wake word ──
-            if msg.get("type") == "AD_ENDED":
+            if msg.get("type") == "VISION":
+                data = msg.get("data", {})
+                if data.get("system_id") == 2:
+                    self.last_vision_time = time.time()
+
+            elif msg.get("type") == "AD_ENDED":
                 self.play_count += 1
-                if self.play_count >= self.MAX_PLAY_COUNT:
-                    print(f">>> [S2] Played {self.MAX_PLAY_COUNT} times. No wake word. Back to S1.")
-                    watch_time = int(time.time() - session_start_time)
-                    asyncio.create_task(self._push_analytics(self.ad_url, watch_time, engage_count=0))
-                    
+                if self.personalized_playlist:
+                    self.playlist_index = (self.playlist_index + 1) % len(self.personalized_playlist)
+                    self.ad_url = self.personalized_playlist[self.playlist_index]
+                
+                if self.play_count >= max(self.MAX_PLAY_COUNT, len(self.personalized_playlist)):
+                    print(">>> [S2] Personalized session complete. Returning to S1.")
                     self.last_timeout_time = time.time()
                     self.system_id = 1
                     self._stop_wake_word()
                     return
                 else:
-                    await self.broadcast_state() # Play next loop
+                    await self.broadcast_state()
 
     async def _push_analytics(self, ad_id: str, watch_time: int, engage_count: int):
         """Dummy helper to format and print Supabase payload without blocking."""
