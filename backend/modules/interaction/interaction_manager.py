@@ -61,6 +61,10 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
         
     speak("Hey! I'm Adorix. How can I help you today?")
     
+    # --- 1.5 Show the Listing ---
+    if state_callback:
+        state_callback(show_listing=True)
+    
     # --- 2. Enter continuous listening loop ---
     while True:
         if is_active_callback and not is_active_callback(): return "ABORTED"

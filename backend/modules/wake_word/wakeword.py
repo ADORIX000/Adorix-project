@@ -128,7 +128,7 @@ class WakeWordService:
                     time.sleep(0.1)
 
         except Exception as e:
-            print(f"CRITICAL WAKE WORD ERROR: {e}")
+            print(f"CRITICAL WAKE WORD ERROR: {e}") 
         finally:
             self.stop()
 

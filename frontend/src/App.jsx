@@ -17,6 +17,8 @@ export default function App() {
   const [adUrl, setAdUrl] = useState('20-40_male.mp4');
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
   const [subtitle, setSubtitle] = useState('');
+  const [productData, setProductData] = useState(null);
+  const [showListing, setShowListing] = useState(false);
 
   // 2. WEBSOCKET INTEGRATION
   const { lastJsonMessage, sendJsonMessage, readyState } = useWebSocket(WS_URL, {
@@ -36,6 +38,8 @@ export default function App() {
       if (lastJsonMessage.ad_url)                  setAdUrl(lastJsonMessage.ad_url);
       if (lastJsonMessage.avatar_state !== undefined) setAvatarState(lastJsonMessage.avatar_state);
       if (lastJsonMessage.subtitle !== undefined)   setSubtitle(lastJsonMessage.subtitle);
+      if (lastJsonMessage.product_data !== undefined) setProductData(lastJsonMessage.product_data);
+      if (lastJsonMessage.show_listing !== undefined) setShowListing(lastJsonMessage.show_listing);
     }
   }, [lastJsonMessage]);
 
@@ -108,6 +112,8 @@ export default function App() {
             avatarState={avatarState}
             setAvatarState={setAvatarState}
             subtitle={subtitle}
+            productData={productData}
+            showListing={showListing}
           />
         </div>
       )}
