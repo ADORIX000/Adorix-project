@@ -9,9 +9,12 @@ export default function AdPlayer({ src, show = true, onEnded }) {
       src={src}
       autoPlay
       muted
-      // Removed 'loop' so it can actually finish and trigger the next ad
       playsInline
       onEnded={onEnded}
+      onError={() => {
+        console.error(`AdPlayer: Failed to load ad ${src}. Skipping.`);
+        if (onEnded) onEnded();
+      }}
       style={styles.video}
     />
   );
@@ -24,6 +27,6 @@ const styles = {
     width: "100%",
     height: "100%",
     objectFit: "cover",
-    zIndex: 0,
+    zIndex: 5,
   },
 };

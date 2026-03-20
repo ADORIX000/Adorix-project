@@ -38,11 +38,18 @@ class ProductQAEngine:
         self._load_all_products()
     
     def _load_all_products(self):
-        """Load all product JSON files into memory."""
-        print("Loading product database...")
+        print(f"DEBUG: Entering _load_all_products from {self.ads_dir}")
         try:
-            for filename in os.listdir(self.ads_dir):
+            if not os.path.exists(self.ads_dir):
+                print(f"DEBUG: Directory NOT FOUND: {self.ads_dir}")
+                return
+                
+            files = os.listdir(self.ads_dir)
+            print(f"DEBUG: Found {len(files)} files in directory")
+            
+            for filename in files:
                 if filename.endswith(".json"):
+                    print(f"DEBUG: Loading {filename}...")
                     filepath = os.path.join(self.ads_dir, filename)
                     with open(filepath, 'r', encoding='utf-8') as f:
                         clean_name = filename.replace(".json", "")

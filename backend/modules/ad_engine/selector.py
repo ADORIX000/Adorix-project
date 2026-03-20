@@ -19,11 +19,19 @@ class AdSelector:
         try:
             files = [f for f in sorted(os.listdir(self.ads_dir)) 
                      if os.path.isfile(os.path.join(self.ads_dir, f)) and f.lower().endswith(".mp4")]
+            
+            # Check for JSON consistency
+            for f in files:
+                json_file = f.replace(".mp4", ".json")
+                if not os.path.isfile(os.path.join(self.ads_dir, json_file)):
+                    print(f"[SELECTOR] Warning: Missing metadata JSON for {f}")
+            
             # If rules request shuffling, shuffle once on load
             if self.rules.get("SHUFFLE_IDLE"):
                 random.shuffle(files)
             return files
-        except Exception:
+        except Exception as e:
+            print(f"[SELECTOR] Error loading ads: {e}")
             return []
 
     def reshuffle_idle_ads(self):
@@ -63,12 +71,35 @@ class AdSelector:
         
         # According to requirements: "add .mp4 for make the ad name"
         filename = f"{demographic_key}.mp4"
+        print(f"[SELECTOR] Searching for ad: {filename} in {self.ads_dir}")
         
         # Optional: check if file exists in ads_dir, otherwise fallback to rules or default
         if os.path.isfile(os.path.join(self.ads_dir, filename)):
+            print(f"[SELECTOR] Found direct match: {filename}")
             return filename
             
-        return self.rules.get(demographic_key, self.rules.get("DEFAULT", "generic_ad.mp4"))
+        # Try finding in rules
+        rule_ad = self.rules.get(demographic_key)
+        if rule_ad and os.path.isfile(os.path.join(self.ads_dir, rule_ad)):
+            return rule_ad
+            
+        return self.rules.get("DEFAULT", "generic_ad.mp4")
+
+    def get_playlist_for_demographics(self, demographics: list) -> list:
+        """Returns a list of ad filenames, starting with personalized matches, followed by all other ads."""
+        playlist = []
+        # First add all specific personalized matches
+        for demo in demographics:
+            ad = self.get_personalized_ad(demo)
+            if ad not in playlist:
+                playlist.append(ad)
+                
+        # Then append all other available ads to ensure "every time use all ads as well"
+        for ad in self.idle_ads:
+            if ad not in playlist:
+                playlist.append(ad)
+                
+        return playlist
 
     def ad_path(self, filename: str) -> str:
         return os.path.join(self.ads_dir, filename)

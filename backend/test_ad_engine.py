@@ -99,13 +99,13 @@ def run_test():
         "status": "ACTIVE",
         "primary": {
             "gender": "female",
-            "age": "16-29"
+            "age": "20-40"
         }
     }
     
     ad = selector.choose_ad_filename(active_payload)
-    print(f"  Payload: Female, 16-29 -> Result: {ad}")
-    if ad == "16-29_female.mp4":
+    print(f"  Payload: Female, 20-40 -> Result: {ad}")
+    if ad == "20-40_female.mp4":
         print("  [OK] Active payload mapping successful.")
     else:
         print("  [FAIL] Active payload mapping failed.")
