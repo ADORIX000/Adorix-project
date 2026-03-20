@@ -9,15 +9,15 @@ import DebugCard from './components/DebugCard';
 export default function App() {
   console.log("App: Component Rendering");
   const [systemId, setSystemId] = useState(1);
-  const [activeAd, setActiveAd] = useState('10-15_female.mp4');
+  const [activeAd, setActiveAd] = useState('20-40_male.mp4');
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
   const [subtitle, setSubtitle] = useState("");
   const [offlineIndex, setOfflineIndex] = useState(0);
   const [playlist, setPlaylist] = useState([
-    '10-15_female.mp4', '10-15_male.mp4', 
-    '16-29_female.mp4', '16-29_male.mp4', 
-    '30-39_female.mp4', '40-49_female.mp4', '40-49_male.mp4', 
-    '50-59_female.mp4', '50-59_male.mp4', 'above-60_female.mp4', 'above-60_male.mp4'
+    'under-20_female.mp4', 'under-20_male.mp4',
+    '20-40_female.mp4',    '20-40_male.mp4',
+    '40-60_female.mp4',    '40-60_male.mp4',
+    'above-60_female.mp4', 'above-60_male.mp4',
   ]);
   
   // Connect directly to the backend on port 8002 to ensure robust WebSocket communication

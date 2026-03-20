@@ -1,17 +1,13 @@
 {
-  "IDLE": "16-29_male.mp4",
-  "DEFAULT": "16-29_male.mp4",
+  "IDLE": "20-40_male.mp4",
+  "DEFAULT": "20-40_male.mp4",
   "SHUFFLE_IDLE": true,
-  "10-15_female": "10-15_female.mp4",
-  "10-15_male": "10-15_male.mp4",
-  "16-29_female": "16-29_female.mp4",
-  "16-29_male": "16-29_male.mp4",
-  "30-39_female": "30-39_female.mp4",
-  "30-39_male": "30-39_female.mp4",
-  "40-49_female": "40-49_female.mp4",
-  "40-49_male": "40-49_male.mp4",
-  "50-59_female": "50-59_female.mp4",
-  "50-59_male": "50-59_male.mp4",
+  "under-20_female": "under-20_female.mp4",
+  "under-20_male":   "under-20_male.mp4",
+  "20-40_female":    "20-40_female.mp4",
+  "20-40_male":      "20-40_male.mp4",
+  "40-60_female":    "40-60_female.mp4",
+  "40-60_male":      "40-60_male.mp4",
   "above-60_female": "above-60_female.mp4",
-  "above-60_male": "above-60_male.mp4"
+  "above-60_male":   "above-60_male.mp4"
 }

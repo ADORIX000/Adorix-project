@@ -67,17 +67,31 @@ class AdorixVision:
         return bboxes
 
     def map_deepface_data(self, raw_age, raw_gender):
-        """Translates exact DeepFace output into Adorix buckets."""
-        # DeepFace usually outputs 'Man' or 'Woman'. We standardize it to 'male' / 'female'.
-        gender = "male" if "man" in raw_gender.lower() or "male" in raw_gender.lower() else "female"
+        """Translates exact DeepFace output into Adorix 4-bucket demographic keys.
         
-        # Map exact integer age to your buckets
-        if raw_age <= 15: age_group = "10-15"
-        elif 16 <= raw_age <= 29: age_group = "16-29"
-        elif 30 <= raw_age <= 39: age_group = "30-39"
-        elif 40 <= raw_age <= 49: age_group = "40-49"
-        elif 50 <= raw_age <= 59: age_group = "50-59"
-        else: age_group = "above-60"
+        Buckets:
+            under-20  : age < 20
+            20-40     : 20 <= age < 40
+            40-60     : 40 <= age <= 60
+            above-60  : age > 60
+            
+        Output format: "{bucket}_{gender}" e.g. "20-40_male", "under-20_female"
+        """
+        # DeepFace outputs 'Man' or 'Woman'.
+        # IMPORTANT: check for female FIRST — "woman" contains "man" as a substring,
+        # so checking `"man" in raw_gender` would incorrectly classify "Woman" as male.
+        gender_lower = raw_gender.lower()
+        gender = "female" if "woman" in gender_lower or "female" in gender_lower else "male"
+        
+        # 4-bucket strict age mapping
+        if raw_age < 20:
+            age_group = "under-20"
+        elif raw_age < 40:
+            age_group = "20-40"
+        elif raw_age <= 60:
+            age_group = "40-60"
+        else:
+            age_group = "above-60"
             
         return f"{age_group}_{gender}"
 
