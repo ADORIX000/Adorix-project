@@ -52,7 +52,7 @@ class AdorixStateManager:
         self.mode         = "IDLE"
         self.avatar_state = "HIDDEN"
         self.subtitle     = ""
-        self.ad_url       = ""
+        self.ad_url       = ""    # Will be set after selector is loaded below
         self.play_count   = 0
         self.last_timeout_time = 0.0
 
@@ -64,6 +64,10 @@ class AdorixStateManager:
         self.selector = AdSelector(rules_path, ads_dir)
         self.wake_word_service = None
         self._start_wake_word()
+
+        # Pre-load the first idle ad so the very first WS broadcast has a real URL.
+        # This prevents the frontend from showing 'Syncing with Loop Engine...' on startup.
+        self.ad_url = self.selector.get_next_idle_ad()
 
         # Initialize Vision Service
         self.vision = AdorixVision(self.broadcast_state, self.selector)
@@ -175,7 +179,9 @@ class AdorixStateManager:
         self.system_id = 1
         self.mode = "IDLE"
         self.avatar_state = "HIDDEN"
-        self.ad_url = ""
+        # Always provide a real ad filename so the frontend LoopView has something to play.
+        # Use the selector's round-robin idle rotation instead of empty string.
+        self.ad_url = self.selector.get_next_idle_ad()
         self.subtitle = ""
         self.play_count = 0
         self.last_timeout_time = time.time()
@@ -230,7 +236,8 @@ async def lifespan(app: FastAPI):
     state_manager = AdorixStateManager()
     
     # Start background tasks
-    threading.Thread(target=start_background_sync, daemon=True).start()
+    # Fix: start_background_sync is async, so use create_task instead of threading.Thread
+    asyncio.create_task(start_background_sync())
     
     yield
     print("[SYSTEM] Shutting down...")
@@ -252,6 +259,34 @@ if os.path.exists(ads_dir):
 @app.get("/")
 async def root():
     return {"status": "Adorix Backend Online", "state": state_manager.mode}
+
+@app.get("/api/ads")
+async def list_ads():
+    """Returns a list of available .mp4 ad filenames from the ads directory.
+    Used by the frontend to populate its offline fallback playlist.
+    """
+    try:
+        files = sorted([
+            f for f in os.listdir(ads_dir)
+            if f.lower().endswith(".mp4")
+        ])
+        return files
+    except Exception as e:
+        return []
+
+@app.post("/api/sync")
+async def trigger_sync():
+    """Triggers an immediate synchronization of ads from Supabase Storage & Database."""
+    from modules.storage import async_sync_ads
+    try:
+        await async_sync_ads()
+        # After sync, we should also refresh the selector's rules and file list
+        if state_manager and state_manager.selector:
+            state_manager.selector.rules = state_manager.selector._load()
+            state_manager.selector.idle_ads = state_manager.selector._load_ads()
+        return {"status": "Sync completed successfully"}
+    except Exception as e:
+        return {"status": "Sync failed", "error": str(e)}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):

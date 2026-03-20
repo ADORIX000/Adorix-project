@@ -40,15 +40,15 @@ const LoopView = ({ adUrl, onEnded }) => {
             muted
             onEnded={(e) => {
               if (isActive && onEnded) onEnded();
-              
-              // If the backend decides to play the exact same video again, 
-              // adUrl won't change, so a new layer won't be created.
-              // So, we manually restart the current video to guarantee continuous playback!
               if (isActive) {
                 setTimeout(() => {
                   if (e.target.paused) e.target.play().catch(console.error);
                 }, 100);
               }
+            }}
+            onError={() => {
+              console.error(`LoopView: Failed to load ad ${layer.url}. Skipping.`);
+              if (isActive && onEnded) onEnded();
             }}
             style={{ 
               position: 'absolute',

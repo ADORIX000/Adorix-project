@@ -14,16 +14,19 @@ export default function InteractionView({ adUrl, avatarState, setAvatarState, su
       {/* ========================================== */}
       {/* 1. THE CINEMATIC BACKGROUND (Dimmed Ad) */}
       {/* ========================================== */}
-      <video 
-        // We continue playing the targeted ad, but we blur and dim it 
-        // so the user's focus shifts entirely to the Avatar.
-        className="absolute inset-0 w-full h-full object-cover opacity-30 blur-sm transition-all duration-1000 ease-in-out" 
-        src={`/ads/${adUrl}`} 
-        autoPlay 
-        loop 
-        muted 
-        playsInline
-      />
+      {/* Only render background ad if we actually have a URL — avoids /ads/ 404 on State 3 entry */}
+      {adUrl && (
+        <video 
+          // We continue playing the targeted ad, but we blur and dim it 
+          // so the user's focus shifts entirely to the Avatar.
+          className="absolute inset-0 w-full h-full object-cover opacity-30 blur-sm transition-all duration-1000 ease-in-out" 
+          src={`/ads/${adUrl}`} 
+          autoPlay 
+          loop 
+          muted 
+          playsInline
+        />
+      )}
 
       {/* A dark gradient from the bottom to make the Avatar pop out clearly */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-0 pointer-events-none"></div>
