@@ -119,7 +119,7 @@ class AdorixStateManager:
         print(f"[STATE] Transitioning to State 2 (Personalized) for {age_gender}")
         
         # Select ad based on detected traits
-        ad_url = self.selector.get_ad(age_gender)
+        ad_url = self.selector.get_personalized_ad(age_gender)
         
         self.system_id = 2
         self.mode = "PERSONALIZED"
@@ -132,7 +132,13 @@ class AdorixStateManager:
 
     async def handle_ad_ended(self):
         """Called when the frontend reports a video ended."""
-        if self.system_id == 2:
+        if self.system_id == 1:
+            # Advance to the next ad in the idle rotation
+            print("[STATE] Loop ad ended. Advancing to next idle ad.")
+            self.ad_url = self.selector.get_next_idle_ad()
+            await self.broadcast_state()
+
+        elif self.system_id == 2:
             self.play_count += 1
             print(f"[STATE] Ad play count: {self.play_count}/{self.MAX_PLAY_COUNT}")
             
