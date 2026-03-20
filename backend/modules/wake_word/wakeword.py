@@ -44,7 +44,7 @@ class WakeWordService:
                 feature_dim=80,
                 max_active_paths=4,
                 keywords_score=3.0,     # Further boosted for easier detection
-                keywords_threshold=0.15, # Lowered threshold (0.2 -> 0.15)
+                keywords_threshold=0.10, # Lowered threshold (0.15 -> 0.10)
             )
             print(">>> [Wake Word] Sherpa-ONNX engine initialized (Sensitivity Boosted).")
         except Exception as e:
@@ -55,12 +55,21 @@ class WakeWordService:
         if not self.spotter: return
 
         try:
-            # Initialize Recorder
+            # Initialize Recorder with Auto-Discovery for USB
             try:
                 if PvRecorder:
-                    self.recorder = PvRecorder(device_index=-1, frame_length=512)
+                    # Find the best device index (prefer USB)
+                    devices = PvRecorder.get_available_devices()
+                    target_index = -1
+                    for i, d in enumerate(devices):
+                        if "USB" in d or "PnP" in d:
+                            print(f">>> [Wake Word] Auto-detected USB Microphone: {d} at index {i}")
+                            target_index = i
+                            break
+                    
+                    self.recorder = PvRecorder(device_index=target_index, frame_length=512)
                     self.recorder.start()
-                    print(">>> [Wake Word] Recording started (PvRecorder)")
+                    print(f">>> [Wake Word] Recording started ({devices[target_index] if target_index != -1 else 'Default Device'})")
                 else:
                     raise ImportError("PvRecorder not found")
             except Exception as e:
@@ -75,6 +84,7 @@ class WakeWordService:
 
             # Sherpa-ONNX stream
             stream = self.spotter.create_stream()
+            consecutive_failures = 0
 
             while not self.stop_program:
                 try:
@@ -87,6 +97,9 @@ class WakeWordService:
                         pcm = self.recorder.read()
                         samples = np.array(pcm, dtype=np.float32) / 32768.0
 
+                    # Reset failure count on success
+                    consecutive_failures = 0
+                    
                     stream.accept_waveform(16000, samples)
                     while self.spotter.is_ready(stream):
                         self.spotter.decode_stream(stream)
@@ -98,8 +111,20 @@ class WakeWordService:
                         # Reset stream after detection to avoid double triggers
                         self.spotter.reset_stream(stream)
                 except Exception as loop_e:
-                    print(f"!!! [Wake Word Loop Error] {loop_e}")
-                    import time
+                    consecutive_failures += 1
+                    print(f"!!! [Wake Word Loop Error] {loop_e} (Failure {consecutive_failures}/10)")
+                    
+                    if consecutive_failures >= 10 and not self.use_fallback:
+                        print("!!! [Wake Word] Persistent failure. Attempting to restart recorder...")
+                        try:
+                            self.recorder.stop()
+                            time.sleep(1)
+                            self.recorder.start()
+                            print(">>> [Wake Word] Recorder restarted successfully.")
+                            consecutive_failures = 0
+                        except:
+                            print("!!! [Wake Word] Restart failed. Check your USB connection.")
+                    
                     time.sleep(0.1)
 
         except Exception as e:

@@ -115,8 +115,12 @@ class AdorixStateManager:
     def on_wake_word(self):
         """Callback from WakeWordService."""
         print("[WAKE] Wake word detected!")
+        # Wake word only transitions to Interaction from State 2 (Personalized)
         if self.system_id == 2:
-            asyncio.run_coroutine_threadsafe(self.transition_to_interaction(), asyncio.get_event_loop())
+            asyncio.run_coroutine_threadsafe(
+                self.transition_to_interaction(), 
+                self.loop or asyncio.get_event_loop()
+            )
 
     async def transition_to_personalized(self, age_gender: str):
         """State 1 -> State 2 Transition."""
@@ -181,14 +185,14 @@ class AdorixStateManager:
         try:
             start_interaction_loop(
                 broadcast_callback=lambda msg: asyncio.run_coroutine_threadsafe(
-                    self.broadcast_state(msg), asyncio.get_event_loop()
+                    self.broadcast_state(msg), self.loop or asyncio.get_event_loop()
                 )
             )
             # When interaction ends naturally:
-            asyncio.run_coroutine_threadsafe(self.transition_to_loop(), asyncio.get_event_loop())
+            asyncio.run_coroutine_threadsafe(self.transition_to_loop(), self.loop or asyncio.get_event_loop())
         except Exception as e:
             print(f"[ERROR] Interaction loop crashed: {e}")
-            asyncio.run_coroutine_threadsafe(self.transition_to_loop(), asyncio.get_event_loop())
+            asyncio.run_coroutine_threadsafe(self.transition_to_loop(), self.loop or asyncio.get_event_loop())
 
     async def transition_to_loop(self):
         """Transition back to State 1 (Loop Mode)."""
