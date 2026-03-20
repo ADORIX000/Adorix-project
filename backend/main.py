@@ -59,6 +59,7 @@ class AdorixStateManager:
         # Consensus Buffer (3-second stabilization)
         self.detection_buffer = []
         self.buffer_start_time = 0.0
+        self.last_sight_time   = 0.0
 
         # WebSocket management
         self.active_websockets: List[WebSocket] = []
@@ -218,38 +219,45 @@ class AdorixStateManager:
             # Process vision logic via the service
             age_gender = self.vision.analyze(frame)
             
-            # If a user is detected and we are in State 1, buffer the result
-            if age_gender and self.system_id == 1:
-                # Initialize buffer start time on first detection
-                if not self.detection_buffer:
-                    self.buffer_start_time = time.time()
+            # --- ROBUST CONSENSUS LOGIC ---
+            if self.system_id == 1:
+                now = time.time()
                 
-                self.detection_buffer.append(age_gender)
-                
-                # If we've collected data for 3 seconds, pick a winner
-                if time.time() - self.buffer_start_time >= 3.0:
-                    from collections import Counter
-                    counts = Counter(self.detection_buffer)
-                    winner, frequency = counts.most_common(1)[0]
+                if age_gender:
+                    # We have a detection! Update last sight and add to buffer.
+                    self.last_sight_time = now
+                    if not self.detection_buffer:
+                        self.buffer_start_time = now
+                        print("[CONSENSUS] Starting 3s observation window...")
                     
-                    print(f"[VISION-CONSENSUS] 3s window complete. Results: {dict(counts)}")
-                    print(f"[VISION-CONSENSUS] Winner: {winner} ({frequency} samples). Triggering State 2.")
+                    self.detection_buffer.append(age_gender)
                     
-                    asyncio.run_coroutine_threadsafe(
-                        self.transition_to_personalized(winner), 
-                        asyncio.get_event_loop()
-                    )
-                    
-                    # Clear buffer
-                    self.detection_buffer = []
+                    # Check if 3s window is complete
+                    if now - self.buffer_start_time >= 3.0:
+                        from collections import Counter
+                        counts = Counter(self.detection_buffer)
+                        winner, freq = counts.most_common(1)[0]
+                        total = len(self.detection_buffer)
+                        
+                        print(f"[CONSENSUS] Window complete. Winner: {winner} ({freq}/{total} samples)")
+                        
+                        # Reset buffer before transition to avoid re-triggering
+                        self.detection_buffer = []
+                        self.buffer_start_time = 0.0
+                        
+                        asyncio.run_coroutine_threadsafe(
+                            self.transition_to_personalized(winner), 
+                            asyncio.get_event_loop()
+                        )
+                else:
+                    # No face seen in this frame. Check for timeout.
+                    # We allow up to 1.5s of "lost face" before we give up on the consensus.
+                    if self.detection_buffer and (now - self.last_sight_time > 1.5):
+                        print("[CONSENSUS] User lost for > 1.5s. Resetting buffer.")
+                        self.detection_buffer = []
+                        self.buffer_start_time = 0.0
             
-            # If no one is seen, and the buffer is old, clear it to avoid stale triggers
-            elif not age_gender and self.detection_buffer:
-                # Optional: Only clear if they've been gone for a while (e.g. 1s)
-                # For now, we clear immediately if a frame yields no face
-                self.detection_buffer = []
-
-            # Control loop speed
+            # Control loop speed (roughly 10 FPS)
             time.sleep(0.1)
         
         cap.release()
