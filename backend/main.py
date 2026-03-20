@@ -60,6 +60,12 @@ class AdorixStateManager:
         self.detection_buffer = []
         self.buffer_start_time = 0.0
         self.last_sight_time   = 0.0
+        
+        # Async loop reference for thread-safe calls
+        try:
+            self.loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self.loop = None
 
         # WebSocket management
         self.active_websockets: List[WebSocket] = []
@@ -217,7 +223,11 @@ class AdorixStateManager:
             if not ret: break
 
             # Process vision logic via the service
-            age_gender = self.vision.analyze(frame)
+            # 1. Trigger non-blocking analyze (it spawns its own thread if not already mapping)
+            self.vision.analyze(frame)
+            
+            # 2. Poll for the latest result (the service updates last_result when thread finishes)
+            age_gender = self.vision.get_latest_result()
             
             # --- ROBUST CONSENSUS LOGIC ---
             if self.system_id == 1:
@@ -247,7 +257,7 @@ class AdorixStateManager:
                         
                         asyncio.run_coroutine_threadsafe(
                             self.transition_to_personalized(winner), 
-                            asyncio.get_event_loop()
+                            self.loop or asyncio.get_event_loop()
                         )
                 else:
                     # No face seen in this frame. Check for timeout.
