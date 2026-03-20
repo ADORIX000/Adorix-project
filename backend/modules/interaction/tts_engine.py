@@ -1,18 +1,32 @@
 import pyttsx3
 import threading
 
+_engine_initialized = False
+
 def _speak_thread(text):
     """
     Initializes pyttsx3 localized to this specific thread.
     This prevents Windows COM objects from getting locked out across
     various backend threads, which causes silent failures on the 2nd run.
     """
+    global _engine_initialized
     try:
+        # Explicitly import win32 components to ensure they are in memory
+        import pythoncom
+        import pywintypes
+        pythoncom.CoInitialize() # Initialize COM for this thread
+        
         engine = pyttsx3.init()
         engine.setProperty('rate', 160)
         engine.setProperty('volume', 1.0)
         engine.say(text)
         engine.runAndWait()
+        _engine_initialized = True
+    except ImportError as e:
+        if "pywintypes" in str(e):
+            print(f"!!! [TTS] Critical error: 'pywintypes' missing. Please ensure pypiwin32 is installed and post-install script run.")
+        else:
+            print(f"!!! [TTS] Import error during speech: {e}")
     except Exception as e:
         print(f"!!! [TTS] Error during speech: {e}")
 
