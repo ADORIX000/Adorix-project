@@ -60,6 +60,7 @@ class AdorixStateManager:
         self.detection_buffer = []
         self.buffer_start_time = 0.0
         self.last_sight_time   = 0.0
+        self.last_personalized_ad = None
         
         # Async loop reference for thread-safe calls
         try:
@@ -169,11 +170,14 @@ class AdorixStateManager:
         if self.system_id != 2: return
         
         print("[STATE] Transitioning to State 3 (Interaction)")
+        # Store context for RAG before clearing ad_url
+        self.last_personalized_ad = self.ad_url
+        
         self.system_id = 3
         self.mode = "INTERACTIVE"
-        self.avatar_state = "VISIBLE"
+        self.avatar_state = "wakeup.webm"  # Trigger the waving animation
         self.ad_url = ""
-        self.subtitle = "How can I help you today?"
+        self.subtitle = "Initializing..."
         
         await self.broadcast_state()
         
@@ -183,10 +187,18 @@ class AdorixStateManager:
     def run_interaction_loop(self):
         """Runs the blocking Interaction Manager."""
         try:
-            start_interaction_loop(
-                broadcast_callback=lambda msg: asyncio.run_coroutine_threadsafe(
-                    self.broadcast_state(msg), self.loop or asyncio.get_event_loop()
+            # Helper to update frontend state from the blocking loop
+            def update_ui(avatar_state=None, subtitle=None):
+                if avatar_state: self.avatar_state = avatar_state
+                if subtitle:     self.subtitle = subtitle
+                asyncio.run_coroutine_threadsafe(
+                    self.broadcast_state(), 
+                    self.loop or asyncio.get_event_loop()
                 )
+
+            start_interaction_loop(
+                current_ad_name=self.last_personalized_ad,
+                state_callback=update_ui
             )
             # When interaction ends naturally:
             asyncio.run_coroutine_threadsafe(self.transition_to_loop(), self.loop or asyncio.get_event_loop())

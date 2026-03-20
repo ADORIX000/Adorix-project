@@ -57,9 +57,9 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
     time.sleep(2.5)
     
     if state_callback:
-        state_callback(avatar_state="talking.webm", subtitle="Hello! Do you have any questions about this ad?")
+        state_callback(avatar_state="talking.webm", subtitle="Hey! I'm Adorix. How can I help you today?")
         
-    speak("Hello! Do you have any questions about this ad?")
+    speak("Hey! I'm Adorix. How can I help you today?")
     
     # --- 2. Enter continuous listening loop ---
     while True:
