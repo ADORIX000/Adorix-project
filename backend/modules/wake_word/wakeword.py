@@ -43,8 +43,8 @@ class WakeWordService:
                 sample_rate=16000,
                 feature_dim=80,
                 max_active_paths=4,
-                keywords_score=2.0,     # Boosted for easier detection
-                keywords_threshold=0.2, # Lowered threshold (0.25 -> 0.2)
+                keywords_score=3.0,     # Further boosted for easier detection
+                keywords_threshold=0.15, # Lowered threshold (0.2 -> 0.15)
             )
             print(">>> [Wake Word] Sherpa-ONNX engine initialized (Sensitivity Boosted).")
         except Exception as e:

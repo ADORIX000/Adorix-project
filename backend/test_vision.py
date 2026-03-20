@@ -19,7 +19,7 @@ from modules.ad_engine.selector import AdSelector
 def mock_broadcast(data):
     sid = data.get("system_id")
     if sid == 1:
-        # Loop Mode - optionally silent or just a dot
+        # Loop Mode - optionally silent or just a dot5
         sys.stdout.write(".")
         sys.stdout.flush()
     elif sid == 2:

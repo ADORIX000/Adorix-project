@@ -3,7 +3,8 @@ import threading
 import time
 import os
 import numpy as np
-from collections import Counter # <-- NEW: For calculating the majority vote
+from collections import Counter
+from deepface import DeepFace # <-- The new AI engine
 from modules.ad_engine.selector import AdSelector
 
 class AdorixVision:
@@ -14,66 +15,28 @@ class AdorixVision:
         self.is_analyzing = False
         
         # --- BUFFER STATE VARIABLES ---
-        self.detection_buffer = []      # Holds all predictions made in the 2-second window
-        self.buffer_start_time = None   # Tracks when the timer started
+        self.detection_buffer = []      
+        self.buffer_start_time = None   
         
-        # Load Models
+        # Load the lightning-fast OpenCV Face Detector
         current_dir = os.path.dirname(os.path.abspath(__file__))
         model_dir = os.path.join(current_dir, "modules", "vision", "models")
         
-        print(f"[VISION] Loading models from {model_dir}...")
-        
+        print(f"[VISION] Loading OpenCV SSD Face Detector...")
         try:
-            # Face Detection Model
             self.face_net = cv2.dnn.readNetFromTensorflow(
                 os.path.join(model_dir, "opencv_face_detector_uint8.pb"),
                 os.path.join(model_dir, "opencv_face_detector.pbtxt")
             )
-            
-            # Age/Gender Models
-            self.age_net = cv2.dnn.readNet(
-                os.path.join(model_dir, "age_net.caffemodel"),
-                os.path.join(model_dir, "age_deploy.prototxt")
-            )
-            self.gender_net = cv2.dnn.readNet(
-                os.path.join(model_dir, "gender_net.caffemodel"),
-                os.path.join(model_dir, "gender_deploy.prototxt")
-            )
-            print("[VISION] Models loaded successfully.")
+            print("[VISION] Face Detector loaded successfully.")
         except Exception as e:
-            print(f"[ERROR] Failed to load models: {e}")
+            print(f"[ERROR] Failed to load Face Detector: {e}")
             self.face_net = None
-            self.age_net = None
-            self.gender_net = None
 
-        self.MODEL_MEAN_VALUES = (78.4263377603, 87.7689143744, 114.895847746)
-        self.AGE_LIST = ['(10-15)', '(16-29)', '(30-39)', '(40-49)', '(50-59)', '(60-100)']
-        # Assuming the model outputs 0 for Female, 1 for Male which is common if male ads appeared for females
-        self.GENDER_LIST = ['Female', 'Male']
-
-    def map_to_group(self, age_idx, gender_pred):
-        """Translates raw AI data into Adorix predefined format."""
-        gender = self.GENDER_LIST[gender_pred[0].argmax()].lower()
-        
-        if age_idx <= 2: age_group = "10-15"
-        elif age_idx == 3: age_group = "16-29"
-        elif age_idx == 4: age_group = "30-39"
-        elif age_idx == 5: age_group = "40-49"
-        elif age_idx == 6: age_group = "50-59"
-        else: age_group = "above-60"
-            
-        return f"{age_group}_{gender}"
-
-    def predict_age_gender(self, face_img):
-        blob = cv2.dnn.blobFromImage(face_img, 1.0, (227, 227), self.MODEL_MEAN_VALUES, swapRB=False)
-        self.gender_net.setInput(blob)
-        gender_preds = self.gender_net.forward()
-        self.age_net.setInput(blob)
-        age_preds = self.age_net.forward()
-        age_idx = age_preds[0].argmax()
-        return age_idx, gender_preds
+        print("[VISION] Note: DeepFace models load automatically on first detection.")
 
     def detect_faces(self, frame):
+        """Extracts bounding boxes using the fast SSD model."""
         h, w = frame.shape[:2]
         blob = cv2.dnn.blobFromImage(frame, 1.0, (300, 300), [104, 117, 123], False, False)
         self.face_net.setInput(blob)
@@ -83,102 +46,113 @@ class AdorixVision:
         try:
             for i in range(detections.shape[2]):
                 confidence = detections[0, 0, i, 2]
-                if confidence > 0.5:
-                    # Scale coordinates and check for validity
+                if confidence > 0.6: # High confidence only
                     raw_x1 = detections[0, 0, i, 3] * w
                     raw_y1 = detections[0, 0, i, 4] * h
                     raw_x2 = detections[0, 0, i, 5] * w
                     raw_y2 = detections[0, 0, i, 6] * h
 
-                    # Guard against non-finite values (NaN/Inf) which cause overflow errors
                     if not all(np.isfinite([raw_x1, raw_y1, raw_x2, raw_y2])):
                         continue
                     
-                    # Convert to integers and clip to frame boundaries
                     x1 = int(np.clip(raw_x1, 0, w - 1))
                     y1 = int(np.clip(raw_y1, 0, h - 1))
                     x2 = int(np.clip(raw_x2, 0, w - 1))
                     y2 = int(np.clip(raw_y2, 0, h - 1))
                     
-                    # Ensure valid box dimensions
                     if x2 > x1 and y2 > y1:
                         bboxes.append((x1, y1, x2, y2))
         except Exception as e:
             print(f"[ERROR] Logic error in detect_faces: {e}")
         return bboxes
 
+    def map_deepface_data(self, raw_age, raw_gender):
+        """Translates exact DeepFace output into Adorix buckets."""
+        # DeepFace usually outputs 'Man' or 'Woman'. We standardize it to 'male' / 'female'.
+        gender = "male" if "man" in raw_gender.lower() or "male" in raw_gender.lower() else "female"
+        
+        # Map exact integer age to your buckets
+        if raw_age <= 15: age_group = "10-15"
+        elif 16 <= raw_age <= 29: age_group = "16-29"
+        elif 30 <= raw_age <= 39: age_group = "30-39"
+        elif 40 <= raw_age <= 49: age_group = "40-49"
+        elif 50 <= raw_age <= 59: age_group = "50-59"
+        else: age_group = "above-60"
+            
+        return f"{age_group}_{gender}"
+
     def analyze(self, frame):
-        """Background worker: Now it only adds to the buffer, it doesn't broadcast."""
+        """Background worker that processes the face using DeepFace."""
         try:
             self.is_analyzing = True
             bboxes = self.detect_faces(frame)
-            demographics_list = []
             
             if bboxes:
                 for (x1, y1, x2, y2) in bboxes:
                     h, w = frame.shape[:2]
-                    padding = 20
-                    py1 = max(0, y1 - padding)
-                    py2 = min(h, y2 + padding)
-                    px1 = max(0, x1 - padding)
-                    px2 = min(w, x2 + padding)
+                    
+                    # Add proportional padding so DeepFace sees the hair/chin
+                    face_width = x2 - x1
+                    face_height = y2 - y1
+                    pad_w = int(face_width * 0.25)
+                    pad_h = int(face_height * 0.25)
+                    
+                    py1 = max(0, y1 - pad_h)
+                    py2 = min(h, y2 + pad_h)
+                    px1 = max(0, x1 - pad_w)
+                    px2 = min(w, x2 + pad_w)
                     
                     face_img = frame[py1:py2, px1:px2]
                     if face_img.size == 0: continue
                     
-                    if self.age_net and self.gender_net:
-                        age_idx, gender_preds = self.predict_age_gender(face_img)
-                        mapped = self.map_to_group(age_idx, gender_preds)
-                        demographics_list.append(mapped)
-                
-                if demographics_list:
-                    # Log real-time detections for console visibility
-                    for d in demographics_list:
-                        print(f"[VISION-LIVE] Detecting: {d}")
+                    # ─── DEEPFACE MAGIC HAPPENS HERE ───
+                    try:
+                        # silent=True stops it from spamming the console
+                        # enforce_detection=False because we already cropped the face
+                        results = DeepFace.analyze(
+                            img_path=face_img, 
+                            actions=['age', 'gender'], 
+                            enforce_detection=False,
+                            silent=True 
+                        )
                         
-                    # Strip duplicates from THIS specific frame and add to the global list
-                    unique_in_frame = list(set(demographics_list))
-                    self.detection_buffer.extend(unique_in_frame)
-                    
+                        # DeepFace returns a list of dicts if multiple faces are found
+                        res = results[0] if isinstance(results, list) else results
+                        
+                        raw_age = res['age']
+                        raw_gender = res['dominant_gender']
+                        
+                        mapped = self.map_deepface_data(raw_age, raw_gender)
+                        
+                        self.detection_buffer.append(mapped)
+                        print(f"[VISION-LIVE] DeepFace: {mapped} (Guessed: {raw_age} yrs, {raw_gender})")
+                        
+                    except Exception as df_err:
+                        # DeepFace throws an error if the image is too blurry
+                        pass 
+                        
         except Exception as e:
             print(f"[ERROR] Analysis error: {e}")
         finally: 
             self.is_analyzing = False
 
     def start(self):
-        """Main loop for face detection and demographic analysis."""
+        """Main camera loop for continuous monitoring."""
         cap = None
-        
-        # Windows: CAP_DSHOW is often much more stable than the default MSMF (700)
-        # Try CAP_DSHOW first, then fallback to default.
         backends = [cv2.CAP_DSHOW, None]
         
         for index in [0, 1, 2]:
             for backend in backends:
                 try:
-                    if backend is not None:
-                        cap = cv2.VideoCapture(index + backend)
-                    else:
-                        cap = cv2.VideoCapture(index)
-                    
+                    cap = cv2.VideoCapture(index + backend) if backend else cv2.VideoCapture(index)
                     if cap.isOpened():
-                        # Set resolution if possible to stabilize
                         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                        
                         ret, test_frame = cap.read()
-                        if ret:
-                            backend_name = "DSHOW" if backend == cv2.CAP_DSHOW else "DEFAULT/MSMF"
-                            print(f"[VISION] Successfully opened camera {index} with {backend_name} backend")
-                            break
-                        else:
-                            cap.release()
-                    else:
-                        cap.release()
-                except Exception as e:
-                    pass
-            if cap and cap.isOpened():
-                break
+                        if ret: break
+                        else: cap.release()
+                except Exception: pass
+            if cap and cap.isOpened(): break
 
         if not cap or not cap.isOpened():
             print("[ERROR] Could not open any webcam. Vision service will exit.")
@@ -193,46 +167,40 @@ class AdorixVision:
                     bboxes = self.detect_faces(frame)
                     
                     if bboxes:
-                        # print(f"[DEBUG] Faces found: {len(bboxes)}")
                         # 1. START THE CLOCK
                         if self.buffer_start_time is None:
                             self.buffer_start_time = time.time()
-                            self.detection_buffer = [] # Start fresh
+                            self.detection_buffer = [] 
                             
-                        # 2. COLLECT DATA (Fire thread continuously without blocking)
+                        # 2. COLLECT DATA (Fire thread continuously)
                         if not self.is_analyzing:
                             threading.Thread(target=self.analyze, args=(frame.copy(),), daemon=True).start()
                             
                         # 3. THE 2-SECOND EVALUATION
                         if time.time() - self.buffer_start_time >= 2.0:
                             if self.detection_buffer:
-                                # Instead of a single winner, get all unique demographics
-                                unique_winners = list(set(self.detection_buffer))
+                                vote_counts = Counter(self.detection_buffer)
+                                winning_demographic = vote_counts.most_common(1)[0][0]
                                 
-                                print(f"\n[ANALYSIS] 2-Sec Window Complete. Detected: {unique_winners}")
+                                print(f"\n[ANALYSIS] 2-Sec Window Complete.")
+                                print(f"[ANALYSIS] Votes: {dict(vote_counts)}")
+                                print(f"[ANALYSIS] WINNER: {winning_demographic}")
                                 
-                                # Select the first ad in the list (main.py will handle rotation if needed)
-                                ad_name = self.selector.get_personalized_ad(unique_winners[0])
+                                ad_name = self.selector.get_personalized_ad(winning_demographic)
                                 
-                                # Broadcast the findings to React
-                                print(f"[DEBUG] Vision Service Broadcasting: ID=2, Demos={unique_winners}")
                                 self.broadcast({
                                     "system_id": 2, 
                                     "ad_url": ad_name,
-                                    "demographics": unique_winners, # Send the full list
-                                    "all_people": True # Flag to indicate multi-person analysis
+                                    "demographics": [winning_demographic], 
+                                    "all_people": True 
                                 })
                             
-                            # Reset the clock so it continues to evaluate every 2 seconds
-                            # while they stand in front of the kiosk.
                             self.buffer_start_time = time.time()
                             self.detection_buffer = []
                     else:
-                        # No one is in the frame -> Wipe the buffer
                         self.buffer_start_time = None
                         self.detection_buffer = []
                         
-                        # Revert to generic Loop Mode (Rate limited)
                         if time.time() - self.last_analysis > 1.0:
                             self.broadcast({"system_id": 1})
                             self.last_analysis = time.time() 
@@ -244,6 +212,5 @@ class AdorixVision:
         except Exception as e:
             print(f"[ERROR] Vision loop error: {e}")
         finally:
-            cap.release()
+            if cap: cap.release()
             cv2.destroyAllWindows()
-            print("[VISION] Camera released.")
