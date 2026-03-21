@@ -390,7 +390,10 @@ async def websocket_endpoint(websocket: WebSocket):
             
             elif message.get("type") in ["WAKE_WORD_DETECTED", "SIMULATE_WAKE_WORD"]:
                 print(">>> [WebSocket] Received simulation/wake word from frontend")
-                state_manager.wake_detected = True
+                if state_manager.system_id == 2:
+                    await state_manager.transition_to_interaction()
+                else:
+                    print(f"[WS] Simulation ignored: System is in State {state_manager.system_id}")
                 
     except Exception as e:
         print(f"[WS] Connection closed: {e}")
