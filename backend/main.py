@@ -230,6 +230,12 @@ class AdorixStateManager:
     async def transition_to_loop(self):
         """Transition back to State 1 (Loop Mode)."""
         print("[STATE] Transitioning to State 1 (Loop)")
+        
+        # Reset vision consensus buffers to ensure a clean start for State 1
+        self.detection_buffer = []
+        self.buffer_start_time = 0.0
+        self.last_sight_time   = 0.0
+        
         self.system_id = 1
         self.mode = "IDLE"
         self.avatar_state = "HIDDEN"
@@ -238,8 +244,12 @@ class AdorixStateManager:
         self.ad_url = self.selector.get_next_idle_ad()
         self.subtitle = ""
         self.play_count = 0
-        self.last_timeout_time = time.time()
         
+        # Set to 0.0 to match the "normal" State 1 (boot) behavior, 
+        # allowing face detection to trigger State 2 immediately.
+        self.last_timeout_time = 0.0
+        
+        print(f"[STATE] State 1 synchronized. Camera is processing for {self.ad_url}")
         await self.broadcast_state()
 
     def run_vision(self):
