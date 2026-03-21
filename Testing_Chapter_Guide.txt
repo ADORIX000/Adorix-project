@@ -1,0 +1,47 @@
+ADORIX PROJECT: TESTING DOCUMENTATION GUIDE (CHAPTER 2)
+
+2.1 Chapter Introduction
+This chapter details the multi-layered testing strategy used for the Adorix AI Kiosk. Testing covered individual hardware components (Microphone, Camera), software sub-systems (Ad Engine, Vision Service, RAG), and the full end-to-end user interaction lifecycle.
+
+2.2 Testing Criteria
+Key criteria to include:
+- Functional Accuracy: Correct ad selection for age/gender.
+- Responsiveness: State transitions within < 3 seconds.
+- Conversation Quality: Accurate product-specific answers via Hybrid QA/Brain engine.
+- Stability: Robustness against background noise and intermittent face detection.
+
+2.3 Testing Functional Requirements
+- Wake Word Detection: Say "Hey Adorix" during a personalized ad. (Pass: Transitions to State 3)
+- Targeted Ad Selection: Present specific demographic to camera. (Pass: Verified via test_ad_engine.py)
+- Product Q&A: Ask product questions. (Pass: Measured Hybrid QA/LLM response)
+- State Reset: Silence for 8 seconds. (Pass: Returns to Loop Mode)
+
+2.4 Testing Non-Functional Requirements
+- Performance: DeepFace (~1.5s), TinyLlama (~3s). Tested via test_interaction.py.
+- Robustness: Thread-safety fix (v2.1) ensures no race conditions during state transition.
+- Consensus: 3-second stabilization window prevents ad flickering.
+
+2.5 Unit Testing
+Diagnostic scripts are located in the /backend folder:
+- test_ad_engine.py: Verifies demographic mapping and rotation rules.
+- test_vision.py: Independent validation of age/gender recognition.
+- verify_stt.py / verify_tts.py: Hardware level verification.
+
+2.6 Performance Testing
+Proof: Timing data embedded in test_interaction.py.
+Example: "Brain Answer (3.2s): '...'"
+Justification: Real-time responsiveness is essential for a premium kiosk experience.
+
+2.7 Usability Testing
+Frontend UX Features (frontend/src/views/InteractionView.jsx):
+- Visual HUD: Microphone animations provide feedback on listening status.
+- UI Overlays: "Personalized Mode" badge and "Live" indicators.
+- Avatar Synthesis: Lip-sync and state transitions (talking/listening).
+
+2.8 Compatibility Testing
+- OS: Fully verified on Windows (pywin32/SAPI5).
+- Hardware: Verified with integrated and external USB cameras (OpenCV).
+- Browser: WebSockets (ws://) verified on Chrome and Edge.
+
+2.9 Chapter Summary
+Testing confirmed Adorix is a robust, responsive AI system. Diagnostic scripts and real-world simulation confirm the hardware-software pipeline is stable and production-ready.
