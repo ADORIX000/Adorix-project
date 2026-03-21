@@ -17,6 +17,17 @@ def _speak_thread(text):
         pythoncom.CoInitialize() # Initialize COM for this thread
         
         engine = pyttsx3.init()
+        # Set to a female voice if possible
+        voices = engine.getProperty('voices')
+        for v in voices:
+            if "female" in v.name.lower() or "zira" in v.name.lower() or "hazel" in v.name.lower():
+                engine.setProperty('voice', v.id)
+                break
+        else:
+            # Fallback to Index 1 if search fails (usually female on Windows)
+            if len(voices) > 1:
+                engine.setProperty('voice', voices[1].id)
+                
         engine.setProperty('rate', 160)
         engine.setProperty('volume', 1.0)
         engine.say(text)
