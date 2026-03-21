@@ -21,6 +21,11 @@ venv_site = os.path.join(venv_base, "Lib", "site-packages")
 if os.path.exists(venv_site):
     if venv_site in sys.path: sys.path.remove(venv_site)
     sys.path.insert(0, venv_site)
+    # CRITICAL: Add win32 paths for pywintypes/SAPI5 (Speech API)
+    win32_path = os.path.join(venv_site, "win32")
+    win32_lib_path = os.path.join(win32_path, "lib")
+    if os.path.exists(win32_path): sys.path.insert(0, win32_path)
+    if os.path.exists(win32_lib_path): sys.path.insert(0, win32_lib_path)
 
 # Add local modules to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
