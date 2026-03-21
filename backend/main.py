@@ -104,6 +104,8 @@ class AdorixStateManager:
             "avatar_state": self.avatar_state,
             "subtitle": self.subtitle or message or "",
             "ad_url": self.ad_url,
+            "show_listing": getattr(self, 'show_listing', False),
+            "product_data": getattr(self, 'current_product_data', {}),
             "timestamp": time.time()
         }
         msg = json.dumps(state_data)
@@ -173,11 +175,24 @@ class AdorixStateManager:
         # Store context for RAG before clearing ad_url
         self.last_personalized_ad = self.ad_url
         
+        # Load product data for the frontend listing
+        self.current_product_data = {}
+        if self.last_personalized_ad:
+            json_name = self.last_personalized_ad.replace(".mp4", ".json")
+            json_path = os.path.join(current_dir, "modules", "ad_engine", "data", json_name)
+            try:
+                if os.path.exists(json_path):
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        self.current_product_data = json.load(f)
+            except Exception as e:
+                print(f"[ERROR] Failed to load product data: {e}")
+
         self.system_id = 3
         self.mode = "INTERACTIVE"
         self.avatar_state = "wakeup.webm"  # Trigger the waving animation
         self.ad_url = ""
         self.subtitle = "Initializing..."
+        self.show_listing = False  # Initially hidden until after greeting
         
         await self.broadcast_state()
         
@@ -188,9 +203,10 @@ class AdorixStateManager:
         """Runs the blocking Interaction Manager."""
         try:
             # Helper to update frontend state from the blocking loop
-            def update_ui(avatar_state=None, subtitle=None):
-                if avatar_state: self.avatar_state = avatar_state
-                if subtitle:     self.subtitle = subtitle
+            def update_ui(avatar_state=None, subtitle=None, show_listing=None):
+                if avatar_state is not None: self.avatar_state = avatar_state
+                if subtitle is not None:     self.subtitle = subtitle
+                if show_listing is not None:  self.show_listing = show_listing
                 asyncio.run_coroutine_threadsafe(
                     self.broadcast_state(), 
                     self.loop or asyncio.get_event_loop()
@@ -371,6 +387,13 @@ async def websocket_endpoint(websocket: WebSocket):
             
             if message.get("type") == "AD_ENDED":
                 await state_manager.handle_ad_ended()
+            
+            elif message.get("type") in ["WAKE_WORD_DETECTED", "SIMULATE_WAKE_WORD"]:
+                print(">>> [WebSocket] Received simulation/wake word from frontend")
+                if state_manager.system_id == 2:
+                    await state_manager.transition_to_interaction()
+                else:
+                    print(f"[WS] Simulation ignored: System is in State {state_manager.system_id}")
                 
     except Exception as e:
         print(f"[WS] Connection closed: {e}")

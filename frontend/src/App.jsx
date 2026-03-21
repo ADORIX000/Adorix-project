@@ -17,6 +17,8 @@ export default function App() {
   const [adUrl, setAdUrl] = useState('20-40_male.mp4');
   const [avatarState, setAvatarState] = useState(AVATAR_STATES.HIDDEN);
   const [subtitle, setSubtitle] = useState('');
+  const [productData, setProductData] = useState(null);
+  const [showListing, setShowListing] = useState(false);
 
   // 2. WEBSOCKET INTEGRATION
   const { lastJsonMessage, sendJsonMessage, readyState } = useWebSocket(WS_URL, {
@@ -36,6 +38,8 @@ export default function App() {
       if (lastJsonMessage.ad_url)                  setAdUrl(lastJsonMessage.ad_url);
       if (lastJsonMessage.avatar_state !== undefined) setAvatarState(lastJsonMessage.avatar_state);
       if (lastJsonMessage.subtitle !== undefined)   setSubtitle(lastJsonMessage.subtitle);
+      if (lastJsonMessage.product_data !== undefined) setProductData(lastJsonMessage.product_data);
+      if (lastJsonMessage.show_listing !== undefined) setShowListing(lastJsonMessage.show_listing);
     }
   }, [lastJsonMessage]);
 
@@ -91,7 +95,7 @@ export default function App() {
                   e.stopPropagation();
                   triggerWakeWord();
                 }}
-                className="absolute bottom-6 right-6 bg-white/5 hover:bg-white/20 text-white/40 hover:text-white px-4 py-2 rounded-lg border border-white/10 text-[10px] font-bold uppercase transition-all pointer-events-auto"
+                className="absolute bottom-10 right-10 bg-adorix-blue hover:bg-adorix-blue/80 text-white px-6 py-3 rounded-2xl shadow-[0_0_30px_rgba(0,184,255,0.4)] border border-white/20 font-black uppercase tracking-widest text-xs transition-all active:scale-95 pointer-events-auto z-50"
               >
                 Simulate Wake Word
               </button>
@@ -108,6 +112,8 @@ export default function App() {
             avatarState={avatarState}
             setAvatarState={setAvatarState}
             subtitle={subtitle}
+            productData={productData}
+            showListing={showListing}
           />
         </div>
       )}

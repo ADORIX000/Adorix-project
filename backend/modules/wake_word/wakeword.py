@@ -6,6 +6,7 @@ except ImportError:
     print("!!! Run: pip install sherpa-onnx sentencepiece numpy")
 import numpy as np
 import os
+import time
 try:
     from pvrecorder import PvRecorder
 except ImportError:
@@ -44,7 +45,7 @@ class WakeWordService:
                 feature_dim=80,
                 max_active_paths=4,
                 keywords_score=3.0,     # Further boosted for easier detection
-                keywords_threshold=0.10, # Lowered threshold (0.15 -> 0.10)
+                keywords_threshold=0.08, # Lowered threshold (0.15 -> 0.10)
             )
             print(">>> [Wake Word] Sherpa-ONNX engine initialized (Sensitivity Boosted).")
         except Exception as e:
@@ -128,7 +129,7 @@ class WakeWordService:
                     time.sleep(0.1)
 
         except Exception as e:
-            print(f"CRITICAL WAKE WORD ERROR: {e}")
+            print(f"CRITICAL WAKE WORD ERROR: {e}") 
         finally:
             self.stop()
 

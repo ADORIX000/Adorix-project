@@ -61,15 +61,22 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
         
     speak("Hey! I'm Adorix. How can I help you today?")
     
+    # --- 1.5 Show the Listing ---
+    if state_callback:
+        state_callback(show_listing=True)
+        
+    # Give the user a moment to see the greeting and listing before listening
+    time.sleep(1.0)
+    
     # --- 2. Enter continuous listening loop ---
     while True:
         if is_active_callback and not is_active_callback(): return "ABORTED"
         if state_callback:
             state_callback(avatar_state="listening.webm", subtitle="Listening...")
 
-        print("\n>>> [System] Listening for user STT input (5-second timeout)...")
-        # STT Engine listens for EXACTLY 5 seconds to prevent hanging
-        user_question = listen_one_phrase(timeout=5)
+        print("\n>>> [System] Listening for user STT input (8-second timeout)...")
+        # STT Engine listens for up to 8 seconds to start and 10 seconds to finish
+        user_question = listen_one_phrase(timeout=8)
         
         if is_active_callback and not is_active_callback(): return "ABORTED"
         
@@ -79,14 +86,23 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
             if state_callback:
                 state_callback(avatar_state="talking.webm", subtitle="Have a nice day!")
             speak("Have a nice day!")
+            time.sleep(1.0) # Buffer before state change
             return "GOTO_LOOP"
             
         # --- 4. Branch B: Process Active Speech ---
+        # Ignore very short noises (less than 2 words/4 chars often indicate just background clicks)
+        if len(user_question.split()) < 2 and len(user_question) < 5:
+            print(f">>> [System] Ignored likely noise: '{user_question}'")
+            continue
+
         print(f">>> [User STT Input] {user_question}")
         if state_callback:
             # Change UI to indicate thinking
             state_callback(avatar_state="thinking.webm", subtitle="Thinking...")
         
+        # Artificial delay to make "Thinking" visible
+        time.sleep(0.8)
+
         # Generate Hybrid Answer using RAG
         answer = get_hybrid_answer(user_question, clean_ad_name)
         
@@ -97,6 +113,7 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
         if state_callback:
             state_callback(avatar_state="talking.webm", subtitle=answer)
         speak(answer)
+        time.sleep(1.0) # Buffer after answering
         
         if is_active_callback and not is_active_callback(): return "ABORTED"
         
@@ -104,3 +121,4 @@ def start_interaction_loop(current_ad_name, state_callback=None, is_active_callb
         if state_callback:
             state_callback(avatar_state="talking.webm", subtitle="Any other questions?")
         speak("Any other questions?")
+        time.sleep(0.5) # Small buffer before returning to listen mode

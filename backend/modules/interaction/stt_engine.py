@@ -1,6 +1,6 @@
 import speech_recognition as sr
 
-def listen_one_phrase(timeout=5):
+def listen_one_phrase(timeout=8, phrase_time_limit=10):
     """
     Listens to the microphone and returns the recognized text.
     Returns None if no speech is detected or if an error occurs.
@@ -10,11 +10,11 @@ def listen_one_phrase(timeout=5):
 
     try:
         with mic as source:
-            print(f">>> [STT] Listening (timeout={timeout}s)...")
+            print(f">>> [STT] Listening (timeout={timeout}s, limit={phrase_time_limit}s)...")
             # Adjust for background noise for better accuracy
             recognizer.adjust_for_ambient_noise(source, duration=0.5)
             # Listen for a single phrase
-            audio = recognizer.listen(source, timeout=timeout)
+            audio = recognizer.listen(source, timeout=timeout, phrase_time_limit=phrase_time_limit)
             
         print(">>> [STT] Processing speech...")
         # Use Google's free Web Speech API (requires internet)
