@@ -387,6 +387,10 @@ async def websocket_endpoint(websocket: WebSocket):
             
             if message.get("type") == "AD_ENDED":
                 await state_manager.handle_ad_ended()
+            
+            elif message.get("type") in ["WAKE_WORD_DETECTED", "SIMULATE_WAKE_WORD"]:
+                print(">>> [WebSocket] Received simulation/wake word from frontend")
+                state_manager.wake_detected = True
                 
     except Exception as e:
         print(f"[WS] Connection closed: {e}")

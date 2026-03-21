@@ -6,6 +6,7 @@ except ImportError:
     print("!!! Run: pip install sherpa-onnx sentencepiece numpy")
 import numpy as np
 import os
+import time
 try:
     from pvrecorder import PvRecorder
 except ImportError:
