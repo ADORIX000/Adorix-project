@@ -1,0 +1,328 @@
+ADORIX PROJECT – CHAPTER 1: IMPLEMENTATION DOCUMENTATION GUIDE
+================================================================
+COVERS: adorix-project (AI Kiosk) + adorix-webb (Web Platform)
+================================================================
+
+
+1.1 CHAPTER OVERVIEW
+---------------------
+This chapter documents the full technical implementation of the Adorix AI Kiosk system, a smart, 
+context-aware advertising platform designed to revolutionize digital advertising experiences. 
+The system comprises two repositories:
+
+  1. adorix-project  – The AI-powered in-store kiosk (hardware/software)
+  2. adorix-webb     – The web-based management platform (dashboard, campaigns, analytics)
+
+Together, these form a cohesive ecosystem where businesses can manage, monitor, and deliver 
+intelligent, personalized advertisements to real-world customers.
+
+
+1.2 OVERVIEW OF THE PROTOTYPE
+-------------------------------
+The Adorix prototype is a dual-repository system:
+
+  [KIOSK SYSTEM – adorix-project]
+  A standalone touchless AI kiosk that:
+    - Continuously plays ad content in Loop Mode (State 1)
+    - Detects viewer age/gender via camera and switches to a Targeted Ad (State 2)
+    - Allows the user to say "Hey Adorix" to begin a full AI conversation (State 3)
+    - Answers product-specific questions using a hybrid QA Engine + TinyLlama LLM
+    - Returns to Loop Mode when interaction ends
+
+  [WEB PLATFORM – adorix-webb]
+  A Next.js web application that:
+    - Provides a business dashboard with analytics and performance metrics
+    - Allows users to manage ad campaigns via the Campaign Studio
+    - Uses Supabase for cloud data storage and Clerk for authentication
+    - Sends real-time ads and metadata to the kiosk over the internet
+
+  Key Integration:
+    - Supabase is the shared cloud database. The web platform uploads ads and sets rules,
+      and the kiosk backend syncs periodically via the /api/sync endpoint.
+
+
+1.3 TECHNOLOGY SELECTIONS
+---------------------------
+
+[adorix-webb – Web Platform Stack]
+
+  Layer           | Technology        | Justification
+  ----------------+-------------------+--------------------------------------------------
+  Framework       | Next.js 16        | Server-side rendering, routing, and performance
+  Auth            | Clerk             | Managed authentication with minimal setup
+  Database        | Supabase          | PostgreSQL with realtime sync and file storage
+  Backend API     | Express.js        | Lightweight REST API for user/contact routes
+  Data Viz        | Recharts          | Flexible chart library for analytics dashboards
+  Animation       | Framer Motion     | Smooth micro-animations for premium UX
+  Styling         | TailwindCSS       | Utility-first CSS for rapid, responsive styling
+  Communication   | Axios             | Clean HTTP requests to the Express backend
+
+[adorix-project – AI Kiosk Stack]
+
+  Layer           | Technology        | Justification
+  ----------------+-------------------+--------------------------------------------------
+  Backend Server  | FastAPI (Python)  | Async HTTP + WebSocket server for real-time state
+  State Machine   | Custom Python     | 3-state synchronous machine managing all logic
+  Vision          | OpenCV + DeepFace | Real-time face detection + age/gender analysis
+  Wake Word       | Sherpa-ONNX       | Offline, fast "Hey Adorix" detection
+  Speech-to-Text  | SpeechRecognition | Microphone capture + Google Speech API
+  Text-to-Speech  | pyttsx3 / SAPI5  | On-device Windows speech synthesis
+  AI / LLM        | TinyLlama (GGUF)  | Lightweight local LLM for product Q&A
+  Frontend        | React + Vite      | Fast, lightweight HMR kiosk display
+  Real-time Comm  | WebSockets        | Instant state push from backend to frontend
+  Ad Storage      | Supabase Storage  | Cloud-synced .mp4 ad files pulled to device
+
+[TECH STACK GRAPHIC]
+You can use this as your diagram (recreate in draw.io or Lucidchart):
+
+   +-------------------+        WebSocket (ws://)        +------------------+
+   | Python FastAPI    |  ==============================> | React Vite       |
+   | State Machine     |                                  | Kiosk Frontend   |
+   | Camera/Mic/TTS    |  <------ AD_ENDED / WAKE ------  | (State 1/2/3 UI) |
+   +-------------------+                                  +------------------+
+           |
+           | Supabase REST API (sync ads/rules)
+           v
+   +-------------------+        Clerk Auth               +------------------+
+   | Supabase DB       |  <============================  | Next.js Web App  |
+   | (ads, campaigns)  |                                 | Dashboard/Studio |
+   +-------------------+                                 +------------------+
+           ^
+           | Supabase SDK + Express API
+           |
+   +-------------------+
+   | adorix-webb       |
+   | Express Backend   |
+   +-------------------+
+
+
+1.4 IMPLEMENTATION OF THE BACKEND COMPONENT
+---------------------------------------------
+
+[adorix-project Backend – FastAPI Python]
+
+  Location: /adorix-project/backend/main.py
+  Entry Point: uvicorn main:app --host 0.0.0.0 --port 8002
+
+  Key Architecture: AdorixStateManager class that manages:
+    - system_id: 1 (Loop), 2 (Personalized), 3 (Interaction)
+    - Vision thread: continuously runs camera and processes faces
+    - Wake word thread: listens for "Hey Adorix" in background
+    - WebSocket connections: broadcasts state to React frontend
+    - Interaction loop: manages TTS/STT conversation
+
+  Key API Endpoints:
+    GET  /            - Health check
+    GET  /api/ads     - List available ad files
+    POST /api/sync    - Pull latest ads from Supabase
+    WS   /ws          - Real-time bidirectional state communication
+
+  Module Structure:
+    modules/ad_engine/     - Rules-based ad selector + demographic mapping
+    modules/interaction/   - STT, TTS, Brain (LLM), and Interaction loop
+    modules/vision/        - OpenCV face detection models
+    modules/wake_word/     - Sherpa-ONNX wake word detection
+    modules/storage.py     - Supabase sync logic
+    modules/analytics.py   - Session data recording
+
+[adorix-webb Backend – Express.js]
+
+  Location: /adorix-webb/backend/src/
+  Entry Point: server.js → app.js
+
+  Architecture: Standard MVC (Model-View-Controller):
+    routes/      - Defines API endpoints (auth, user, contact)
+    controllers/ - Handles request logic
+    services/    - Business logic and external API calls
+    middlewares/ - Auth guards, CORS
+
+  Key API Routes:
+    POST /api/contact     - Handles contact form submissions (nodemailer)
+    GET  /api/auth        - Authentication routes (Clerk integration)
+    GET/PUT /api/user     - User profile management (CRUD)
+
+  Screenshot points:
+    - Screenshot of the routes/ folder in VS Code
+    - Screenshot of app.js showing CORS and route setup
+    - Screenshot of auth.controller.js showing CRUD operations
+
+
+1.5 IMPLEMENTATION OF THE FRONTEND COMPONENT
+----------------------------------------------
+
+[adorix-project Frontend – React + Vite]
+
+  Location: /adorix-project/frontend/src/
+
+  Key Structure:
+    App.jsx              - Root: WebSocket logic + state routing (systemId 1/2/3)
+    views/LoopView.jsx   - State 1: Full-screen idle video player
+    views/PersonalizedView.jsx - State 2: Targeted ad with wake-word prompt overlay
+    views/InteractionView.jsx  - State 3: Avatar, subtitles, and product listing card
+    avatar/AvatarOverlay.jsx   - Manages webm avatar videos (wakeup/listen/talk/think/sleep)
+    avatar/avatarStates.js     - Enum constants for all avatar states
+    components/DebugCard.jsx   - Real-time system state HUD overlay
+
+  Real-time: App.jsx uses react-use-websocket to maintain a persistent WS connection
+  to the FastAPI backend and updates UI state from every broadcast message.
+
+[adorix-webb Frontend – Next.js App Router]
+
+  Location: /adorix-webb/app/
+
+  Key Pages:
+    app/(site)/home/           - Public landing page
+    app/dashboard/             - Protected analytics & campaign overview
+    app/campaign-studio/       - Ad creation and management tool
+    app/profile/               - User profile settings (Clerk-managed)
+    app/pricing/               - Subscription plans page
+
+  Screenshot points:
+    - Screenshot of the app/ folder structure in VS Code
+    - Screenshot of the dashboard page component
+
+
+1.6 IMPLEMENTATION OF THE DATA SCIENCE COMPONENT
+--------------------------------------------------
+
+  [Vision & AI Pipeline – adorix-project]
+
+  This is the core data science component:
+
+  1. FACE DETECTION (Hardware Input)
+     File: backend/vision_service.py
+     - OpenCV DNN (SSD model) detects faces in each webcam frame
+     - Confidence threshold: 60%. Runs at ~10 FPS
+     - On detection: crops face region + sends to DeepFace worker thread
+
+  2. DEMOGRAPHIC ANALYSIS (DeepFace)
+     - DeepFace.analyze() runs in a background thread to avoid blocking
+     - Extracts: age (numeric) + dominant_gender (Male/Female)
+     - Maps to key: e.g., "20-40_male", "under-20_female"
+     - 3-second CONSENSUS WINDOW: collects 30 samples and takes majority vote
+       to prevent misfires from momentary detections
+
+  3. AD SELECTION (Rules Engine)
+     File: backend/modules/ad_engine/selector.py
+     - Reads rules.json (demographic key → .mp4 filename mapping)
+     - Returns matching personalized ad URL for State 2
+
+  4. NATURAL LANGUAGE (Hybrid QA / LLM)
+     File: backend/modules/interaction/brain_engine.py
+     - ProductQAEngine: pre-indexed product JSON, exact keyword matching (fast)
+     - TinyLlama (llama-cpp-python): local LLM fallback for open-ended questions
+     - Context loaded from product JSON files (brand, price, features, FAQs)
+
+  Screenshot points:
+    - Screenshot of vision_service.py showing detect_faces() and _deepface_worker()
+    - Screenshot of backend console showing [VISION-LIVE] DeepFace: 20-40_male output
+    - Screenshot of test_interaction.py running Brain Engine test
+
+
+1.7 GIT REPOSITORY
+--------------------
+
+  Two separate repositories are used:
+
+  REPO 1 – adorix-project
+    URL: https://github.com/[your-username]/Adorix-project
+    Purpose: AI Kiosk System
+    Key branches: main
+
+  REPO 2 – adorix-webb
+    URL: https://github.com/[your-username]/adorix-webb
+    Purpose: Web Management Platform
+    Key branches: main
+
+  Good practices implemented:
+    - .gitignore files in both repos exclude: node_modules/, venv/, .env, *.log
+    - Environment variables stored in .env files (never committed)
+    - Separate repos for clean separation of concerns
+
+  Screenshot points:
+    - Screenshot of GitHub showing both repo commits
+    - Screenshot of .gitignore in VS Code
+    - Screenshot of git log or GitHub commit history
+
+
+1.8 DEPLOYMENTS / CI-CD PIPELINE
+-----------------------------------
+
+  [adorix-webb – Web Platform]
+    Platform: Vercel (recommended for Next.js)
+    Steps:
+      1. Push to GitHub → Vercel auto-builds via GitHub integration
+      2. Build command: next build
+      3. Environment variables set in Vercel dashboard (NEXT_PUBLIC_SUPABASE_URL, etc.)
+    Domain: https://adorixit.com (as seen in Express.js CORS config)
+
+  [adorix-webb Backend – Express.js]
+    Platform: Railway / Render / VPS
+    Steps:
+      1. Push to GitHub → Auto-deploy from main branch
+      2. Start command: node backend/src/server.js
+
+  [adorix-project Kiosk]
+    This runs LOCALLY on the kiosk hardware (Windows PC)
+    Startup: run_adorix.bat automates:
+      1. Launch Python FastAPI backend (port 8002)
+      2. Launch React Vite frontend (npm run dev)
+    Note: Not cloud-deployed – this is an on-device system
+
+  Screenshot points:
+    - Screenshot of Vercel dashboard showing next.js deployment
+    - Screenshot of run_adorix.bat contents
+    - Screenshot of system running in browser at localhost:5173
+
+
+1.9 CRUD OPERATIONS
+---------------------
+
+  CRUD operations exist across both repos:
+
+  [adorix-webb – Web Platform]
+
+  CREATE:
+    - POST /api/contact → Creates a new contact inquiry (contact.controller.js)
+    - Campaign Studio: Creates new ad campaign in Supabase
+    - Clerk: Registers a new user account
+
+  READ:
+    - GET /api/user → Reads user profile data from Supabase (user.controller.js)
+    - Dashboard: Reads analytics data from Supabase for display in Recharts charts
+    - GET /api/contact → Reads submitted contact forms
+
+  UPDATE:
+    - PUT /api/user → Updates user profile settings
+    - Campaign Studio: Edits existing campaign metadata (title, targeting, schedule)
+
+  DELETE:
+    - Campaign Studio: Deletes an ad campaign from Supabase
+    - User profile deletion (via Clerk admin)
+
+  [adorix-project – AI Kiosk]
+
+  CREATE:
+    - POST /api/sync → Pulls new ad files from Supabase and writes them to /ads/
+    - Analytics module records new session data on each State 3 interaction
+
+  READ:
+    - GET /api/ads → Reads available .mp4 files in the /ads/ directory
+    - AdSelector reads rules.json to query demographic-to-ad mappings
+
+  UPDATE:
+    - State machine updates system state (system_id, ad_url, mode) on transitions
+    - rules.json is refreshed after each sync
+
+  DELETE:
+    - Old or expired ads removed from /ads/ directory during sync
+
+  Screenshot points:
+    - Screenshot of user.controller.js showing READ and UPDATE
+    - Screenshot of selector.py showing demographic-to-ad mapping (READ)
+    - Screenshot of storage.py showing the sync (CREATE + DELETE) logic
+    - Screenshot of Supabase table showing campaign/ad data
+
+================================================================
+END OF GUIDE
+================================================================
