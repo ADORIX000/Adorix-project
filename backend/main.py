@@ -37,7 +37,7 @@ ads_dir = os.path.join(current_dir, "ads")
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ─── Local Modules ──────────────────────────────────────────────────────────────
-from wake_word.wakeword import WakeWordService # Sherpa-ONNX implementation
+from wake_word.wakewordpicovoice import WakeWordService # Picovoice implementation
 from interaction.interaction_manager import start_interaction_loop
 from vision_service import AdorixVision
 from modules.ad_engine.selector import AdSelector
