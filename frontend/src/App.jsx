@@ -119,7 +119,7 @@ export default function App() {
       )}
 
       {/* OVERLAY ENGINE: Debug HUD (Always stays on top) */}
-      <DebugCard systemId={systemId} isConnected={isConnected} />
+      {/*<DebugCard systemId={systemId} isConnected={isConnected} />*/}
       
       {/* GLOBAL PRELOADS: Hidden video elements to keep avatar assets in memory */}
       <div className="hidden">
